@@ -49,3 +49,7 @@ uv run pytest
 - docs/: Project specifications and design documents
 
 
+Example command
+```
+uv run run_test.py assets/sample.png --steps 500 --greedy --opacity 0.5 --patience 20
+```

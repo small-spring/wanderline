@@ -2,9 +2,10 @@ import numpy as np
 import cv2
 import math
 
-def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None, length: int = None, return_end: bool = False) -> np.ndarray:
+def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None, length: int = None, opacity: float = 1.0, return_end: bool = False) -> np.ndarray:
     """
     Draw a stroke from a start point (default center) in the given angle.
+    Supports semi-transparent strokes with opacity in [0,1].
     Returns the new image, and optionally the end point if return_end is True.
     """
     h, w = state.shape[:2]
@@ -25,7 +26,13 @@ def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None,
     ey = min(max(cy + dy, 0), h - 1)
     end_pt = (ex, ey)
     img = state.copy()
-    cv2.line(img, (cx, cy), end_pt, (0, 0, 0), thickness=3)
+    # draw with opacity: fully opaque or blended
+    if opacity >= 1.0:
+        cv2.line(img, (cx, cy), end_pt, (0, 0, 0), thickness=3)
+    else:
+        overlay = img.copy()
+        cv2.line(overlay, (cx, cy), end_pt, (0, 0, 0), thickness=3)
+        img = cv2.addWeighted(overlay, opacity, img, 1.0 - opacity, 0)
     if return_end:
         return img, end_pt
     return img
