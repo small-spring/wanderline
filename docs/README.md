@@ -1,5 +1,16 @@
 # Wanderline
 
+## Documentation
+
+This folder contains the following documentation files:
+
+- [Overview](README.md)
+- [Coding Rules](coding_rules.md)
+- [Specification](specification.md)
+- [Detailed Design](detailed_design.md)
+
+---
+
 Wanderline is an agent that draws images in a one-stroke style based on a given motif image. It outputs drawing angles for each stroke, which can later be used to control devices like robotic arms.
 
 ## Prerequisites

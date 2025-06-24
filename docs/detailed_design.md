@@ -1,3 +1,7 @@
+# Detailed Design
+
+This document provides the detailed system architecture, data definitions, API specifications, and module-level design for the Wanderline project.
+
 # wanderline 詳細設計
 
 ## 1. データ定義・フォーマット

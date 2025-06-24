@@ -2,10 +2,10 @@ import numpy as np
 import cv2
 import math
 
-def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None, length: int = None) -> tuple[np.ndarray, tuple[int, int]]:
+def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None, length: int = None, return_end: bool = False) -> np.ndarray:
     """
     Draw a stroke from a start point (default center) in the given angle.
-    Returns the new image and the end point of the stroke.
+    Returns the new image, and optionally the end point if return_end is True.
     """
     h, w = state.shape[:2]
     # determine start point and clamp within bounds
@@ -26,4 +26,6 @@ def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None,
     end_pt = (ex, ey)
     img = state.copy()
     cv2.line(img, (cx, cy), end_pt, (0, 0, 0), thickness=3)
-    return img, end_pt
+    if return_end:
+        return img, end_pt
+    return img

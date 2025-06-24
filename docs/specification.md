@@ -1,3 +1,7 @@
+# Specification
+
+This document defines the project requirements, system components, and development environment for the Wanderline project.
+
 # wanderline プロジェクト仕様書
 
 ## 1. 概要

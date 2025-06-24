@@ -9,6 +9,7 @@ dependencies = [
     "opencv-python",
     "scikit-image",
     "pillow",
+    "matplotlib",
     "pytest>=8.4.1",
 ]
 

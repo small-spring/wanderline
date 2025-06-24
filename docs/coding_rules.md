@@ -1,0 +1,17 @@
+# Coding Rules
+
+This document outlines the coding conventions and workflow guidelines for the Wanderline project.
+
+- File names must be in English.
+- Comments must be in English; do not use other languages in the code.
+- Ensure tests pass and commit at appropriate times.
+- Use clear and consistent file naming; avoid ad-hoc suffixes:
+    - good: _v1
+    - bad: _final
+- After editing, run using `uv run`.
+- Make small incremental changes and run tests frequently.
+- After implementation, execute the code.
+
+Use `uv` for environment setup and package management:
+- `uv run <python_file>`
+- `uv add <python_packages>`

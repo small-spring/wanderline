@@ -8,7 +8,10 @@ import random
 import math
 from wanderline.reward import compute_reward
 from wanderline.video_recorder import VideoRecorder
+from wanderline.agent import choose_next_angle
 import cv2
+from wanderline.reward import l2_distance
+from wanderline.plot_utils import plot_distances
 import os
 
 def main():
@@ -19,13 +22,15 @@ def main():
         with open(cfg_file, 'r') as f:
             config = json.load(f)
     ratio_def = config.get('ratio', 0.2)
-    steps_def = config.get('steps', 5)
-    fps_def = config.get('fps', 1)
+    steps_def = config.get('steps', 100)
+    duration_def = config.get('duration', 15.0)
     # parse arguments
     parser = argparse.ArgumentParser(description="Apply strokes and compute rewards")
     parser.add_argument('motif_path', nargs='?', default=None, help='Path to motif image')
     parser.add_argument('--ratio', type=float, default=ratio_def, help='Stroke length ratio of min(width,height)')
-    parser.add_argument('--steps', type=int, default=steps_def, help='Number of strokes to apply')
+    parser.add_argument('--steps', type=int, default=steps_def, help='Number of strokes to apply (default 100)')
+    parser.add_argument('--duration', type=float, default=duration_def, help='Desired total video duration in seconds')
+    parser.add_argument('--greedy', action='store_true', help='Use greedy agent to choose stroke angles')
     args = parser.parse_args()
     # validate arguments
     if not (0 < args.ratio <= 1):
@@ -68,16 +73,28 @@ def main():
     # initialize video recorder for strokes
     frame_size = (canvas.shape[1], canvas.shape[0])
     video_path = os.path.join(out_dir, "drawing.mp4")
-    recorder = VideoRecorder(video_path, frame_size, fps= fps_def)
+    # compute fps to fit desired duration
+    total_frames = args.steps + 1
+    fps = max(1.0, total_frames / args.duration)
+    recorder = VideoRecorder(video_path, frame_size, fps=fps)
     recorder.record(initial_canvas)
+    # track loss (distance) over frames
+    distances = []
+    if motif is not None:
+        init_dist = l2_distance(initial_canvas, motif)
+        print(f"Initial distance: {init_dist:.2f}")
+        distances.append(init_dist)
 
     # apply strokes and compute rewards
     total_reward = 0.0
     prev_canvas = canvas
     for i in range(args.steps):
         try:
-            angle = random.uniform(0, 2 * math.pi)
-            next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=current_start, length=stroke_length)
+            if args.greedy and motif is not None:
+                angle = choose_next_angle(prev_canvas, motif, current_start, stroke_length)
+            else:
+                angle = random.uniform(0, 2 * math.pi)
+            next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=current_start, length=stroke_length, return_end=True)
         except Exception as e:
             print(f"Error during stroke application at step {i+1}: {e}", file=sys.stderr)
             sys.exit(1)
@@ -85,7 +102,10 @@ def main():
         if motif is not None:
             r = compute_reward(prev_canvas, next_canvas, motif)
             total_reward += r
-            print(f"Step {i + 1}/{args.steps}: angle={angle:.2f}, reward={r:.2f}")
+            # log reward and new distance
+            dist_next = l2_distance(next_canvas, motif)
+            print(f"Step {i + 1}/{args.steps}: angle={angle:.2f}, reward={r:.2f}, distance={dist_next:.2f}")
+            distances.append(dist_next)
         prev_canvas = next_canvas
         current_start = end_pt
 
@@ -105,6 +125,11 @@ def main():
     print(f"Drawing video saved as {video_path}")
     if motif is not None:
         print(f"Total reward after {args.steps} steps: {total_reward:.2f}")
+        # summary of distance fluctuation (loss)
+        stats = np.array(distances)
+        print(f"Distance stats - min: {stats.min():.2f}, max: {stats.max():.2f}, mean: {stats.mean():.2f}, var: {stats.var():.2f}")
+        # plot distance curve
+        plot_distances(distances, out_dir)
 
 if __name__ == "__main__":
     main()
