@@ -6,11 +6,10 @@ import numpy as np
 import argparse
 import random
 import math
-from wanderline.reward import compute_reward
+from wanderline.reward import compute_reward, compute_reward_with_white_penalty, l2_distance, l2_distance_with_white_penalty
 from wanderline.video_recorder import VideoRecorder
 from wanderline.agent import choose_next_angle
 import cv2
-from wanderline.reward import l2_distance
 from wanderline.plot_utils import plot_distances
 import os
 import datetime
@@ -221,9 +220,24 @@ def main():
     converged = False
     if args.patience <= 0:
         patience_counter = -1  # a sentinel to disable early stopping
+    # --- Reward/Distance function selection ---
+    reward_fns = {
+        'l2': compute_reward,
+        'l2_white_penalty': lambda prev, next_, motif: compute_reward_with_white_penalty(prev, next_, motif, alpha=args.white_penalty_alpha)
+    }
+    distance_fns = {
+        'l2': l2_distance,
+        'l2_white_penalty': lambda a, b: l2_distance_with_white_penalty(a, b, alpha=args.white_penalty_alpha)
+    }
+    reward_fn = reward_fns[args.reward_type]
+    distance_fn = distance_fns[args.reward_type]
+    if args.reward_type == 'l2_white_penalty' and args.white_penalty_alpha is None:
+        print("Error: --white-penalty-alpha must be set when using l2_white_penalty.", file=sys.stderr)
+        sys.exit(1)
+
     if motif is not None:
         if not args.resume_from:
-            init_dist = l2_distance(initial_canvas, motif)
+            init_dist = distance_fn(initial_canvas, motif)
             print(f"Initial distance: {init_dist:.2f}")
             distances.append(init_dist)
             best_distance = init_dist
@@ -246,10 +260,10 @@ def main():
         if i in frames_to_record:
             recorder.record(next_canvas)
         if motif is not None:
-            r = compute_reward(prev_canvas, next_canvas, motif)
+            r = reward_fn(prev_canvas, next_canvas, motif)
             total_reward += r
             # log reward and new distance
-            dist_next = l2_distance(next_canvas, motif)
+            dist_next = distance_fn(next_canvas, motif)
             print(f"Step {i + 1}/{args.steps}: angle={angle:.2f}, reward={r:.2f}, distance={dist_next:.2f}")
             distances.append(dist_next)
             # Early stopping check
