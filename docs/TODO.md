@@ -1,6 +1,11 @@
 # TODO / Task List for Wanderline
+- Coding agentが一貫してタスクをこなせるように編集する領域。
+- 同時に、ユーザーはこれを読んでCoding agentが今何をやっているかを確認することができる。
+- ユーザーは最後のセクションに要望をメモしておくことで、coding agentに（抽象的・間違っていることもある）要求を共有できる。
+
 
 ## In Progress / Next Steps
+- [ ] Modularize run_test.py (currently 358 lines, exceeds 150 line limit)
 - [ ] Refactor run_test.py to support reward/loss function selection via config/CLI (l2, l2_white_penalty, etc.)
 - [ ] Add config/CLI option for white penalty alpha and other hyperparameters
 - [ ] Implement function selection logic (dict/factory) in run_test.py
@@ -10,6 +15,7 @@
 - [ ] Update README and docs for new options and usage
 
 ## Completed
+- [x] Fix `uv run python run_test.py` execution issue (line_width type error)
 - [x] Add white penalty reward/loss functions to reward.py
 - [x] Add/expand unit tests for all reward/loss functions (normal and error cases)
 - [x] Make test_and_commit.sh accept commit message as argument
@@ -21,10 +27,9 @@
 - [ ] Add more advanced agent strategies (non-greedy, RL, etc.)
 - [ ] Improve CLI help and documentation
 
-## User Requests (to be broken down and moved to other sections)
-- `uv run python run_test.py` だけで動かないのでそれを直したい。
-- run_test.pyが長すぎる
-- linewidthはintである必要はない気がする。linewidthを最終的に使っているところを特定し、確認したい
+## User Requests (coding agent will broke these down and move to other sections)
+- run_test.pyが長すぎる (358 lines, needs modularization)
+- linewidthの型についての確認 (resolved: kept as int, fixed config.json)
 
 ---
 
