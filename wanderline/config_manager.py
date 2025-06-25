@@ -18,7 +18,7 @@ def load_config_and_parse_args():
     
     # Parse only --config first
     args_pre, _ = temp_parser.parse_known_args()
-    cfg_file = args_pre.config if args_pre.config else os.path.join(os.getcwd(), 'config.json')
+    cfg_file = args_pre.config if args_pre.config else os.path.join(os.getcwd(), 'configs', 'default.json')
     if os.path.isfile(cfg_file):
         with open(cfg_file, 'r') as f:
             config = json.load(f)
@@ -32,9 +32,13 @@ def load_config_and_parse_args():
     patience_def = config.get('patience', 10)
     min_delta_def = config.get('min_delta', 1e-4)
     reward_type_def = config.get('reward_type', 'l2')
-    white_penalty_alpha_def = config.get('white_penalty_alpha', None)
+    white_penalty_def = config.get('white_penalty', None)
     greedy_def = config.get('greedy', False)
     agent_type_def = config.get('agent_type', 'greedy')
+    lookahead_depth_def = config.get('lookahead_depth', 1)
+    verbose_def = config.get('verbose', False)
+    beam_width_def = config.get('beam_width', 5)
+    n_rollouts_def = config.get('n_rollouts', 10)
     
     # Create the main parser with all arguments
     parser = argparse.ArgumentParser(
@@ -42,7 +46,7 @@ def load_config_and_parse_args():
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument('--config', type=str, default=None,
-                        help='Path to config JSON file. If not set, uses ./config.json if present.')
+                        help='Path to config JSON file. If not set, uses ./configs/default.json if present.')
     parser.add_argument('motif_path', nargs='?', default=motif_path_def,
                         help='Path to the motif image file. This is the target image that the agent will try to replicate.\nIf not provided, a blank canvas will be used.')
     parser.add_argument('--ratio', type=float, default=ratio_def,
@@ -55,6 +59,8 @@ def load_config_and_parse_args():
                         help='If set, the agent will use a greedy algorithm to choose the next stroke angle that minimizes the immediate distance to the motif.\nIf not set, angles are chosen randomly.')
     parser.add_argument('--agent-type', type=str, default=agent_type_def, choices=['greedy', 'transformer'],
                         help='Type of agent to use for drawing.\nOptions:\n  greedy: Greedy search agent (existing implementation)\n  transformer: Transformer-based agent for multi-step planning\nDefault: greedy')
+    parser.add_argument('--lookahead-depth', type=int, default=lookahead_depth_def,
+                        help='Lookahead depth for greedy agent. 1 = standard greedy (immediate reward), >1 = multi-step lookahead.\nHigher values provide better planning but increase computation time exponentially.\nDefault: 1')
     parser.add_argument('--opacity', type=float, default=opacity_def,
                         help='The opacity of each stroke, where 0.0 is fully transparent and 1.0 is fully opaque.\nDefault is 1.0.')
     parser.add_argument('--patience', type=int, default=patience_def,
@@ -63,12 +69,14 @@ def load_config_and_parse_args():
                         help='For early stopping. The minimum change in distance to be considered an improvement.\nDefault is 1e-4.')
     parser.add_argument('--resume_from', type=str, default=None,
                         help="Path to a previous output directory (e.g., 'outputs/20231027_123456').\nThe run will resume from the state saved in that directory, including the canvas, step count, and configuration.")
-    parser.add_argument('--reward-type', type=str, default=reward_type_def, choices=['l2', 'l2_white_penalty'],
-                        help='Reward/loss function type to use.\nOptions:\n  l2: Standard L2 distance (mean squared error)\n  l2_white_penalty: L2 distance with penalty for drawing on white areas\nDefault: l2')
-    parser.add_argument('--white-penalty-alpha', type=float, default=white_penalty_alpha_def,
-                        help='Alpha value for white penalty. Required when --reward-type is l2_white_penalty.\nControls the strength of the white penalty (higher = stronger penalty).\nExample: 0.1')
+    parser.add_argument('--reward-type', type=str, default=reward_type_def, choices=['l2', 'l2_white_penalty', 'l2_coverage_bonus', 'l2_exploration_bonus'],
+                        help='Reward/loss function type to use.\nOptions:\n  l2: Standard L2 distance (mean squared error)\n  l2_white_penalty: L2 distance with penalty for white pixels\nDefault: l2')
+    parser.add_argument('--white-penalty', type=float, default=white_penalty_def,
+                        help='White penalty strength (scale-invariant mode). Required when --reward-type is l2_white_penalty.\nControls penalty strength as ratio to L2 distance.\nRecommended range: 0.05-0.5\nExample: 0.1')
     parser.add_argument('--line-width', type=int, default=int(config.get('line_width', 3)),
                         help='Stroke thickness (line width) for drawing. Default is from config.json or 3.')
+    parser.add_argument('--verbose', action='store_true', default=verbose_def,
+                        help='Enable verbose output showing timing information for agent computations. Useful for performance analysis.')
     
     args = parser.parse_args()
     
@@ -85,6 +93,10 @@ def validate_args(args):
     if args.steps < 0:
         print("Error: --steps must be non-negative", file=sys.stderr)
         sys.exit(1)
-    if args.reward_type == 'l2_white_penalty' and args.white_penalty_alpha is None:
-        print("Error: --white-penalty-alpha must be set when using l2_white_penalty.", file=sys.stderr)
+    if args.reward_type == 'l2_white_penalty':
+        if args.white_penalty is None:
+            print("Error: --white-penalty must be set when using l2_white_penalty.", file=sys.stderr)
+            sys.exit(1)
+    if args.lookahead_depth < 1:
+        print("Error: --lookahead-depth must be >= 1", file=sys.stderr)
         sys.exit(1)

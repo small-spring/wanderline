@@ -1,6 +1,7 @@
 """
 Transformer-based agent for multi-step planning in drawing tasks.
 This is the initial implementation focusing on the basic architecture.
+まだ使わない
 """
 
 import torch

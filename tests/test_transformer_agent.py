@@ -1,5 +1,6 @@
 """
 Tests for transformer agent implementation.
+まだ使わない。
 """
 
 import numpy as np

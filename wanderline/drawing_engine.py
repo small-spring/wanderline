@@ -4,7 +4,7 @@ import math
 import numpy as np
 from wanderline.canvas import apply_stroke
 from wanderline.agent import choose_next_angle
-from wanderline.transformer_agent import TransformerAgent, GreedyAgent
+from wanderline.transformer_agent import TransformerAgent
 from wanderline.reward import compute_reward, compute_reward_with_white_penalty, l2_distance, l2_distance_with_white_penalty
 from wanderline.video_recorder import VideoRecorder
 from wanderline.plot_utils import plot_distances
@@ -17,13 +17,19 @@ class DrawingEngine:
     
     def __init__(self, args):
         self.args = args
+        
+        # Determine white penalty parameters
+        white_penalty = getattr(args, 'white_penalty', None)
+        
         self.reward_fns = {
             'l2': compute_reward,
-            'l2_white_penalty': lambda prev, next_, motif: compute_reward_with_white_penalty(prev, next_, motif, alpha=args.white_penalty_alpha)
+            'l2_white_penalty': lambda prev, next_, motif: compute_reward_with_white_penalty(
+                prev, next_, motif, white_penalty=white_penalty)
         }
         self.distance_fns = {
             'l2': l2_distance,
-            'l2_white_penalty': lambda a, b: l2_distance_with_white_penalty(a, b, alpha=args.white_penalty_alpha)
+            'l2_white_penalty': lambda a, b: l2_distance_with_white_penalty(
+                a, b, white_penalty=white_penalty)
         }
         self.reward_fn = self.reward_fns[args.reward_type]
         self.distance_fn = self.distance_fns[args.reward_type]
@@ -109,7 +115,17 @@ class DrawingEngine:
                 if self.agent_type == 'transformer' and motif is not None:
                     angle = self.agent.choose_next_angle(prev_canvas, motif, current_start, stroke_length)
                 elif self.args.greedy and motif is not None:
-                    angle = choose_next_angle(prev_canvas, motif, current_start, stroke_length)
+                    angle = choose_next_angle(
+                        prev_canvas, motif, current_start, stroke_length, 
+                        lookahead_depth=self.args.lookahead_depth,
+                        reward_type=self.args.reward_type,
+                        white_penalty=getattr(self.args, 'white_penalty', None),
+                        opacity=self.args.opacity,
+                        line_width=self.args.line_width,
+                        use_vectorized=True,
+                        use_full_vectorization=True,
+                        verbose=getattr(self.args, 'verbose', False)
+                    )
                 else:
                     angle = random.uniform(0, 2 * math.pi)
                 next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=current_start, length=stroke_length, 

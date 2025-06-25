@@ -4,16 +4,25 @@ This document explains how to configure Wanderline using configuration files and
 
 ## Configuration File
 
-Wanderline can be configured using a JSON configuration file. By default, it looks for `config.json` in the current directory, but you can specify a different file with the `--config` option.
+Wanderline can be configured using a JSON configuration file. By default, it looks for `configs/default.json` in the current directory, but you can specify a different file with the `--config` option.
 
 ### Creating a Configuration File
 
-1. Copy the sample configuration file:
+1. Copy an existing configuration file:
    ```bash
-   cp config.sample.json config.json
+   cp configs/quick_test_l2.json configs/my_config.json
    ```
 
-2. Edit `config.json` to suit your needs.
+2. Edit `configs/my_config.json` to suit your needs.
+
+### Available Configuration Files
+
+The `configs/` directory contains several pre-configured files:
+
+- **`default.json`**: Default configuration used when no `--config` is specified
+- **`quick_test_l2.json`**: Quick test with standard L2 distance (100 steps)
+- **`quick_test_white_penalty.json`**: Quick test with white penalty (100 steps)  
+- **`long_run.json`**: Long-duration run configuration (5000 steps)
 
 ### Configuration Options
 
@@ -68,15 +77,28 @@ Wanderline can be configured using a JSON configuration file. By default, it loo
 - **`reward_type`** (string): Type of reward/loss function to use
   - Available options:
     - `"l2"`: Standard L2 distance (mean squared error)
-    - `"l2_white_penalty"`: L2 distance with penalty for drawing on white areas
+    - `"l2_white_penalty"`: L2 distance with penalty for white pixels
   - Example: `"l2"`
   - Default: `"l2"`
 
-- **`white_penalty_alpha`** (float): Alpha value for white penalty
-  - Required only when `reward_type` is `"l2_white_penalty"`
-  - Controls the strength of the white penalty
-  - Example: `0.1`
-  - Default: `null`
+##### White Penalty Settings
+
+When using `"l2_white_penalty"`, you must specify the `white_penalty` parameter.
+
+- **`white_penalty`** (float): Penalty strength (scale-invariant mode)
+  - Formula: `loss = l2_distance * (1 + white_penalty * white_ratio)`
+  - Penalty scales with L2 distance, making it scale-invariant
+  - Recommended range: 0.05-0.5
+  - Example: `0.1` (10% penalty when canvas is fully white)
+
+##### White Penalty Example
+
+```json
+{
+  "reward_type": "l2_white_penalty",
+  "white_penalty": 0.1
+}
+```
 
 #### Run Management
 
@@ -98,7 +120,10 @@ uv run python run_test.py
 uv run python run_test.py assets/sample.png --steps 1000 --greedy
 
 # Use white penalty reward function
-uv run python run_test.py --reward-type l2_white_penalty --white-penalty-alpha 0.1
+uv run python run_test.py --reward-type l2_white_penalty --white-penalty 0.1
+
+# Use a specific config file
+uv run python run_test.py --config configs/long_run.json
 
 # Resume from previous run
 uv run python run_test.py --resume_from outputs/20231027_123456
@@ -113,7 +138,7 @@ uv run python run_test.py --help
 
 ## Tips
 
-1. **Start with the sample configuration**: Copy `config.sample.json` to `config.json` and modify as needed.
+1. **Start with an existing configuration**: Copy one of the provided configs (e.g., `configs/quick_test_l2.json`) and modify as needed.
 
 2. **Experiment with different reward functions**: The `l2_white_penalty` function can help avoid drawing on white areas.
 

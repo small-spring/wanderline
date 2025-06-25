@@ -1,22 +1,36 @@
 # Wanderline
 
+Wanderline is an agent that draws images in a single-stroke style based on a given motif image. It outputs drawing angles for each stroke, which can later be used to control devices like robotic arms.
+
 ## Documentation
 
-This folder contains the following documentation files:
+### For Users
+- **[Configuration Guide](config_guide.md)** - How to configure Wanderline with config files and CLI options
+- **[Technical Specification](specification.md)** - Detailed technical documentation and API reference
 
-for coding agent
-- [TODO](TODO.md)
-- [Coding Rules](coding_rules.md) 
-    - First, please review and restate the coding rules!
+### For Developers
+- **[Coding Rules](coding_rules.md)** - Development guidelines and code standards
+- **[TODO](TODO.md)** - Task tracking and development roadmap
 
-for people
-- [Overview](README.md)
-- [Specification](specification.md)
-- [Configuration Guide](config_guide.md) - How to configure Wanderline with config files and CLI options
+## Project Structure
+
+```
+wanderline/
+├── configs/          # Configuration files
+│   ├── default.json        # Default configuration
+│   ├── quick_test_*.json   # Quick test configurations
+│   └── long_run.json       # Long-duration run configuration
+├── debug/            # Debugging and analysis scripts (development only)
+│   └── README.md           # Guidelines for debug scripts
+├── docs/             # Documentation
+├── wanderline/       # Main Python package
+├── tests/            # Unit tests
+├── assets/           # Sample images and resources
+├── outputs/          # Generated outputs (timestamped folders)
+└── scripts/          # Utility scripts
+```
 
 ---
-
-Wanderline is an agent that draws images in a one-stroke style based on a given motif image. It outputs drawing angles for each stroke, which can later be used to control devices like robotic arms.
 
 ## Prerequisites
 
@@ -35,18 +49,33 @@ uv add numpy Pillow opencv-python pytest
 
 Wanderline can be configured in two ways:
 
-1. **Configuration File**: Create a `config.json` file for repeated use
+1. **Configuration File**: Use one of the pre-configured files or create your own
    ```zsh
-   cp config.sample.json config.json
-   # Edit config.json with your preferred settings
+   # Use default configuration
+   uv run python run_test.py
+   
+   # Use specific configuration
+   uv run python run_test.py --config configs/quick_test_l2.json
    ```
 
 2. **Command-line Arguments**: Override any setting directly
    ```zsh
-   uv run python run_test.py --steps 500 --greedy
+   uv run python run_test.py --steps 500 --greedy --white-penalty 0.15
    ```
 
 For detailed configuration options, see the [Configuration Guide](config_guide.md).
+
+## Development Notes
+
+### Debug Scripts
+
+The `debug/` folder is available for temporary debugging and analysis scripts during development. These scripts are not part of the main codebase and can be used for:
+
+- Testing specific functionality
+- Analyzing algorithm behavior
+- Quick experiments and prototyping
+
+See `debug/README.md` for guidelines on creating debug scripts.
 
 ## Usage
 
@@ -64,6 +93,7 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
 - `--steps <int>`: Total number of strokes to draw. Default: `100`.
 - `--duration <float>`: Desired duration of the output video in seconds. Default: `15.0`.
 - `--greedy`: If set, use a greedy algorithm to choose the next stroke angle. Otherwise, angles are chosen randomly.
+- `--agent-type <str>`: Type of agent to use. Options: `greedy` (default), `transformer`. The transformer agent uses neural networks for multi-step planning.
 - `--opacity <float>`: Opacity of each stroke (from `0.0` to `1.0`). Default: `1.0`.
 - `--patience <int>`: Early stopping patience. The number of steps with no significant improvement before stopping. Set to `0` to disable. Default: `10`.
 - `--min-delta <float>`: The minimum change in distance to be considered an improvement for early stopping. Default: `1e-4`.
@@ -99,6 +129,22 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
     uv run python run_test.py assets/sample.png --line-width 5
     ```
 
+6.  **Using Transformer agent for multi-step planning:**
+    ```zsh
+    uv run python run_test.py assets/sample.png --agent-type transformer --steps 100 --opacity 0.3
+    ```
+
+7.  **Using configuration files for different agent types:**
+    ```zsh
+    # Standard transformer configuration
+    uv run python run_test.py --config config_transformer.json
+    
+    # Short test with transformer
+    uv run python run_test.py --config config_transformer_short.json
+    
+    # Detailed drawing with white penalty
+    uv run python run_test.py --config config_transformer_detailed.json
+    ```
 ## Run all tests
 ```zsh
 uv run pytest

@@ -1,0 +1,14 @@
+{
+  "motif_path": "assets/sample.png",
+  "ratio": 0.1,
+  "steps": 100,
+  "duration": 5.0,
+  "opacity": 0.3,
+  "line_width": 2,
+  "greedy": true,
+  "patience": 10,
+  "min_delta": 0.001,
+  "reward_type": "l2_white_penalty",
+  "white_penalty": 0.1,
+  "resume_from": null
+}
