@@ -12,6 +12,8 @@ This document outlines the coding conventions and workflow guidelines for the Wa
 - Make small incremental changes and run tests frequently.
 - After implementation, execute the code.
 - Pay attention to code quality. Consider modularizing code if it exceeds 150 lines.
+- **After tests pass, commit your changes.**
+- You can use `scripts/test_and_commit.sh` to automatically run tests and commit if they pass.
 
 Use `uv` for environment setup and package management:
 - `uv run <python_file>`

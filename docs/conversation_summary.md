@@ -45,3 +45,30 @@ The following files have been created or modified and are in a stable state:
 - `tests/test_reward.py`
 
 All major usability, reproducibility, and experiment management features have been implemented and tested. The system is now robust and ready for further development.
+
+## Implementation Plan: Reward/Loss Function Flexibility & Testing
+
+### 1. Refactor reward/loss functions
+- Ensure all reward/loss functions (including new ones) raise clear errors if required arguments (e.g., alpha) are missing.
+- Keep function interfaces explicit and robust for future extensions.
+
+### 2. Configurable selection in run_test.py
+- Add config/CLI options to select reward/loss function type (e.g., l2, l2_white_penalty, etc.)
+- Add config/CLI option for white penalty alpha (and other future hyperparameters)
+- Use a function dictionary or factory to select and wrap the appropriate function, ensuring a unified call interface.
+
+### 3. Update run_test.py logic
+- Replace direct calls to compute_reward/l2_distance with the selected function from config.
+- Ensure all outputs (distance curve, early stopping, summary) use the selected metric.
+
+### 4. Expand and refactor tests
+- Add/expand unit tests for all reward/loss functions (normal and error cases)
+- Add parameterized tests for different function types and hyperparameters
+- Ensure all legacy tests still pass (regression)
+
+### 5. (Optional) Modularize if code grows
+- If reward/loss/strategy functions increase, split into multiple files for maintainability.
+
+---
+
+This plan will ensure flexible, robust, and easily testable reward/loss function selection for future experiments and development.
