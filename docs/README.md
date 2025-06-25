@@ -12,6 +12,7 @@ for coding agent
 for people
 - [Overview](README.md)
 - [Specification](specification.md)
+- [Configuration Guide](config_guide.md) - How to configure Wanderline with config files and CLI options
 
 
 

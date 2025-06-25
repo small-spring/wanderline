@@ -1,0 +1,32 @@
+{
+  "// Comment: This is a sample configuration file for Wanderline": "Copy and modify as needed",
+  "// All parameters are optional - CLI arguments will override these values": "",
+  
+  "// === Basic Drawing Parameters ===": "",
+  "motif_path": "assets/sample.png",
+  "ratio": 0.1,
+  "steps": 500,
+  "duration": 15.0,
+  "opacity": 0.1,
+  "line_width": 1,
+  
+  "// === Agent Behavior ===": "",
+  "greedy": true,
+  
+  "// === Early Stopping ===": "",
+  "patience": 20,
+  "min_delta": 0.0001,
+  
+  "// === Reward/Loss Function ===": "",
+  "// Available options: 'l2', 'l2_white_penalty'": "",
+  "reward_type": "l2",
+  "// Required only when reward_type is 'l2_white_penalty'": "",
+  "white_penalty_alpha": 0.1,
+  
+  "// === Run Management ===": "",
+  "// Set to null or remove for new runs": "",
+  "resume_from": null,
+  
+  "// === Legacy/Deprecated ===": "",
+  "thickness": 3
+}

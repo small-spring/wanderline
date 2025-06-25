@@ -11,15 +11,13 @@ def load_config_and_parse_args():
     """
     # Load config
     config = {}
-    parser = argparse.ArgumentParser(
-        description="Wanderline: A system for generating single-stroke drawings that mimic a motif image.",
-        formatter_class=argparse.RawTextHelpFormatter
-    )
-    parser.add_argument('--config', type=str, default=None,
-                        help='Path to config JSON file. If not set, uses ./config.json if present.')
+    
+    # Create a temporary parser just for --config option
+    temp_parser = argparse.ArgumentParser(add_help=False)
+    temp_parser.add_argument('--config', type=str, default=None)
     
     # Parse only --config first
-    args_pre, _ = parser.parse_known_args()
+    args_pre, _ = temp_parser.parse_known_args()
     cfg_file = args_pre.config if args_pre.config else os.path.join(os.getcwd(), 'config.json')
     if os.path.isfile(cfg_file):
         with open(cfg_file, 'r') as f:
@@ -30,11 +28,13 @@ def load_config_and_parse_args():
     steps_def = config.get('steps', 100)
     duration_def = config.get('duration', 15.0)
     
-    # Parse all arguments with config defaults
+    # Create the main parser with all arguments
     parser = argparse.ArgumentParser(
         description="Wanderline: A system for generating single-stroke drawings that mimic a motif image.",
         formatter_class=argparse.RawTextHelpFormatter
     )
+    parser.add_argument('--config', type=str, default=None,
+                        help='Path to config JSON file. If not set, uses ./config.json if present.')
     parser.add_argument('motif_path', nargs='?', default=None,
                         help='Path to the motif image file. This is the target image that the agent will try to replicate.\nIf not provided, a blank canvas will be used.')
     parser.add_argument('--ratio', type=float, default=ratio_def,
@@ -54,9 +54,9 @@ def load_config_and_parse_args():
     parser.add_argument('--resume_from', type=str, default=None,
                         help="Path to a previous output directory (e.g., 'outputs/20231027_123456').\nThe run will resume from the state saved in that directory, including the canvas, step count, and configuration.")
     parser.add_argument('--reward-type', type=str, default='l2', choices=['l2', 'l2_white_penalty'],
-                        help='Reward/loss function type to use. Options: l2, l2_white_penalty. Default: l2.')
+                        help='Reward/loss function type to use.\nOptions:\n  l2: Standard L2 distance (mean squared error)\n  l2_white_penalty: L2 distance with penalty for drawing on white areas\nDefault: l2')
     parser.add_argument('--white-penalty-alpha', type=float, default=None,
-                        help='Alpha value for white penalty (only used if reward-type is l2_white_penalty).')
+                        help='Alpha value for white penalty. Required when --reward-type is l2_white_penalty.\nControls the strength of the white penalty (higher = stronger penalty).\nExample: 0.1')
     parser.add_argument('--line-width', type=int, default=int(config.get('line_width', 3)),
                         help='Stroke thickness (line width) for drawing. Default is from config.json or 3.')
     
