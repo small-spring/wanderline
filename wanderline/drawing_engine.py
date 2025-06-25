@@ -115,8 +115,19 @@ class DrawingEngine:
                 if self.agent_type == 'transformer' and motif is not None:
                     angle = self.agent.choose_next_angle(prev_canvas, motif, current_start, stroke_length)
                 elif self.args.greedy and motif is not None:
+                    # Auto-select n_samples based on lookahead_depth if not specified
+                    n_samples = getattr(self.args, 'n_samples', None)
+                    if n_samples is None:
+                        if self.args.lookahead_depth == 1:
+                            n_samples = 36  # Fast 1-step lookahead
+                        elif self.args.lookahead_depth == 2:
+                            n_samples = 12  # Practical 2-step lookahead
+                        else:
+                            n_samples = 8   # Conservative for 3+ steps
+                    
                     angle = choose_next_angle(
                         prev_canvas, motif, current_start, stroke_length, 
+                        n_samples=n_samples,
                         lookahead_depth=self.args.lookahead_depth,
                         reward_type=self.args.reward_type,
                         white_penalty=getattr(self.args, 'white_penalty', None),

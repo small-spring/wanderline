@@ -36,6 +36,7 @@ def load_config_and_parse_args():
     greedy_def = config.get('greedy', False)
     agent_type_def = config.get('agent_type', 'greedy')
     lookahead_depth_def = config.get('lookahead_depth', 1)
+    n_samples_def = config.get('n_samples', None)  # Auto-select based on lookahead_depth if None
     verbose_def = config.get('verbose', False)
     beam_width_def = config.get('beam_width', 5)
     n_rollouts_def = config.get('n_rollouts', 10)
@@ -61,6 +62,8 @@ def load_config_and_parse_args():
                         help='Type of agent to use for drawing.\nOptions:\n  greedy: Greedy search agent (existing implementation)\n  transformer: Transformer-based agent for multi-step planning\nDefault: greedy')
     parser.add_argument('--lookahead-depth', type=int, default=lookahead_depth_def,
                         help='Lookahead depth for greedy agent. 1 = standard greedy (immediate reward), >1 = multi-step lookahead.\nHigher values provide better planning but increase computation time exponentially.\nDefault: 1')
+    parser.add_argument('--n-samples', type=int, default=n_samples_def,
+                        help='Number of angle candidates to consider per step.\nRecommended: 36 for 1-step, 12-16 for 2-step lookahead.\nIf not set, auto-selected based on lookahead-depth.')
     parser.add_argument('--opacity', type=float, default=opacity_def,
                         help='The opacity of each stroke, where 0.0 is fully transparent and 1.0 is fully opaque.\nDefault is 1.0.')
     parser.add_argument('--patience', type=int, default=patience_def,

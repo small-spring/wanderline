@@ -61,6 +61,19 @@ The `configs/` directory contains several pre-configured files:
   - `false`: Choose angles randomly
   - Default: `false`
 
+- **`lookahead_depth`** (integer): Number of steps ahead to search when using greedy mode
+  - Range: 1 to 3 (higher values exponentially increase computation)
+  - `1`: Greedy (immediate reward only)
+  - `2`: 2-step lookahead (recommended)
+  - `3+`: Not recommended (very slow)
+  - Default: `1`
+
+- **`n_samples`** (integer): Number of angle candidates to consider per step
+  - For 1-step lookahead: up to 36 (recommended: 24-36)
+  - For 2-step lookahead: up to 16 (recommended: 12-16)
+  - For 3+ steps: up to 8 (not recommended)
+  - Default: Auto-selected based on lookahead_depth
+
 #### Early Stopping
 
 - **`patience`** (integer): Number of steps with no improvement before stopping
@@ -119,6 +132,9 @@ uv run python run_test.py
 # Override specific options
 uv run python run_test.py assets/sample.png --steps 1000 --greedy
 
+# Use 2-step lookahead with optimized settings
+uv run python run_test.py --greedy --lookahead_depth 2 --n_samples 12
+
 # Use white penalty reward function
 uv run python run_test.py --reward-type l2_white_penalty --white-penalty 0.1
 
@@ -147,3 +163,10 @@ uv run python run_test.py --help
 4. **Adjust opacity for layered effects**: Lower opacity values (e.g., 0.1) can create interesting layered drawing effects.
 
 5. **Use greedy mode for better results**: The `--greedy` flag often produces better results than random angle selection.
+
+6. **Optimize multi-step lookahead**: 
+   - For fast results: Use `lookahead_depth=1` with `n_samples=36`
+   - For better quality: Use `lookahead_depth=2` with `n_samples=12-16`
+   - Avoid `lookahead_depth>=3` unless necessary (very slow)
+
+7. **Memory considerations**: The vectorized implementation can use significant memory with large n_samples and lookahead_depth. Monitor memory usage during long runs.

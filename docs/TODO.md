@@ -38,7 +38,7 @@ When making changes to the codebase, update the following documents as needed:
 - [x] `docs/README.md` - Reorganized documentation structure
 - [ ] `docs/README.md` - Need to update with current white penalty usage examples
 
-## In Progress / Next Steps
+## In Progress / Next Steps  
 - [x] Improve argument naming for white penalty parameters (alpha -> absolute_penalty, alpha_ratio -> relative_penalty) - COMPLETED: Changed to absolute_penalty/relative_penalty
 - [x] Clean up white penalty argument naming to avoid confusion with alpha (transparency) - COMPLETED: Simplified to single `white_penalty` parameter
 - [x] Consider simplifying config by removing absolute penalty option (keep only relative penalty) - COMPLETED: Only scale-invariant penalty remains
@@ -51,9 +51,18 @@ When making changes to the codebase, update the following documents as needed:
 - [x] Test both legacy and new reward/loss modes (unit/integration)
 - [x] Update README and docs for new options and usage
 - [x] Add transformer agent integration to run_test.py
+- [x] Implement vectorized multi-step greedy search (2-step lookahead with practical limits)
+- [x] Add memory and speed analysis for practical parameter recommendations
+- [x] Clean up agent.py - removed unused functions, improved documentation
 - [ ] Implement actual transformer architecture (currently using MLP)
 - [ ] Add expert trajectory generation for training data
 - [ ] Implement supervised pre-training pipeline
+
+## Recent Improvements (2025-06-25)
+- **Vectorized Multi-Step Agent**: Implemented efficient 2-step lookahead with practical memory limits
+- **Performance Analysis**: Determined optimal n_samples settings (36 for 1-step, 12-16 for 2-step)
+- **Code Cleanup**: Removed unused functions, improved English documentation, reduced agent.py from 611 to 372 lines
+- **Practical Settings**: Based on memory/speed analysis, established realistic parameter recommendations
 
 ## Completed
 - [x] Modularize run_test.py (was 358 lines, now 46 lines with separate modules)
@@ -67,7 +76,42 @@ When making changes to the codebase, update the following documents as needed:
 - [x] Delete obsolete sample.json and debug files
 - [x] Organize docs/ folder structure
 
-## Ideas / Backlog
+## Vectorized Multi-Step Agent Implementation Status
+
+### Implementation Details
+- **Core Functions Implemented**:
+  - `choose_next_angle()` - Main entry point with routing logic
+  - `choose_next_angle_vectorized()` - Fast 1-step lookahead (up to 36 samples)
+  - `choose_next_angle_vectorized_lookahead()` - 2-step lookahead (up to 16 samples)
+  - `_choose_next_angle_greedy()` / `_choose_next_angle_lookahead()` - Sequential fallbacks
+
+### Performance Recommendations
+Based on memory and speed analysis (`debug/memory_analysis.py`, `debug/practical_limits.py`):
+
+- **1-step lookahead**: n_samples up to 36 (practical and fast)
+- **2-step lookahead**: n_samples up to 12-16 (16^2 = 256 combinations max)
+- **3+ step lookahead**: Not recommended (exponential complexity)
+
+### Usage in Configuration
+```json
+{
+  "greedy": true,
+  "lookahead_depth": 2,
+  "n_samples": 12
+}
+```
+
+### Integration Status
+- [x] Integrated with `drawing_engine.py`
+- [x] All tests passing
+- [x] Memory analysis completed
+- [x] Documentation updated
+
+## Deprecated/Removed Functions
+- `choose_next_angle_fully_vectorized_2step()` - Removed (excessive memory usage)
+- `choose_next_angle_memory_efficient_2step()` - Removed (incomplete implementation)
+
+These were replaced with the more practical `choose_next_angle_vectorized_lookahead()` approach.
 - [ ] Implement multi-step greedy search with configurable lookahead depth (moved from In Progress)
 - [ ] Update CLI/config system to support lookahead_depth parameter
 - [ ] Add unit tests for multi-step greedy agent
