@@ -34,6 +34,7 @@ def load_config_and_parse_args():
     reward_type_def = config.get('reward_type', 'l2')
     white_penalty_alpha_def = config.get('white_penalty_alpha', None)
     greedy_def = config.get('greedy', False)
+    agent_type_def = config.get('agent_type', 'greedy')
     
     # Create the main parser with all arguments
     parser = argparse.ArgumentParser(
@@ -52,6 +53,8 @@ def load_config_and_parse_args():
                         help='The desired duration of the output video in seconds. The frame rate will be adjusted to match this duration.\nDefault is based on config.json or 15.0.')
     parser.add_argument('--greedy', action='store_true', default=greedy_def,
                         help='If set, the agent will use a greedy algorithm to choose the next stroke angle that minimizes the immediate distance to the motif.\nIf not set, angles are chosen randomly.')
+    parser.add_argument('--agent-type', type=str, default=agent_type_def, choices=['greedy', 'transformer'],
+                        help='Type of agent to use for drawing.\nOptions:\n  greedy: Greedy search agent (existing implementation)\n  transformer: Transformer-based agent for multi-step planning\nDefault: greedy')
     parser.add_argument('--opacity', type=float, default=opacity_def,
                         help='The opacity of each stroke, where 0.0 is fully transparent and 1.0 is fully opaque.\nDefault is 1.0.')
     parser.add_argument('--patience', type=int, default=patience_def,

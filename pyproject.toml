@@ -11,6 +11,8 @@ dependencies = [
     "pillow",
     "matplotlib",
     "pytest>=8.4.1",
+    "torch>=2.7.1",
+    "torchvision>=0.22.1",
 ]
 
 [tool.poetry.dev-dependencies]

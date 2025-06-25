@@ -4,6 +4,7 @@ import math
 import numpy as np
 from wanderline.canvas import apply_stroke
 from wanderline.agent import choose_next_angle
+from wanderline.transformer_agent import TransformerAgent, GreedyAgent
 from wanderline.reward import compute_reward, compute_reward_with_white_penalty, l2_distance, l2_distance_with_white_penalty
 from wanderline.video_recorder import VideoRecorder
 from wanderline.plot_utils import plot_distances
@@ -26,6 +27,15 @@ class DrawingEngine:
         }
         self.reward_fn = self.reward_fns[args.reward_type]
         self.distance_fn = self.distance_fns[args.reward_type]
+        
+        # Initialize agent based on type
+        if hasattr(args, 'agent_type') and args.agent_type == 'transformer':
+            # Canvas shape will be determined later when we have the actual canvas
+            self.agent = None
+            self.agent_type = 'transformer'
+        else:
+            # Use existing greedy behavior for backward compatibility
+            self.agent_type = 'greedy'
     
     def setup_video_recording(self, canvas, out_dir):
         """
@@ -61,6 +71,12 @@ class DrawingEngine:
         Execute the main drawing loop.
         Returns: (final_canvas, distances, total_reward, current_start, converged, executed_steps)
         """
+        # Initialize transformer agent if needed
+        if self.agent_type == 'transformer' and self.agent is None:
+            canvas_shape = (canvas.shape[0], canvas.shape[1])
+            self.agent = TransformerAgent(canvas_shape, sequence_length=10, feature_dim=128)
+            print("Initialized TransformerAgent")
+        
         # Compute stroke length based on ratio
         h, w = canvas.shape[:2]
         stroke_length = int(min(w, h) * self.args.ratio)
@@ -90,7 +106,9 @@ class DrawingEngine:
         
         for i in range(self.args.steps):
             try:
-                if self.args.greedy and motif is not None:
+                if self.agent_type == 'transformer' and motif is not None:
+                    angle = self.agent.choose_next_angle(prev_canvas, motif, current_start, stroke_length)
+                elif self.args.greedy and motif is not None:
                     angle = choose_next_angle(prev_canvas, motif, current_start, stroke_length)
                 else:
                     angle = random.uniform(0, 2 * math.pi)
