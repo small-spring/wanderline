@@ -5,7 +5,6 @@
 
 
 ## In Progress / Next Steps
-- [ ] Modularize run_test.py (currently 358 lines, exceeds 150 line limit)
 - [ ] Refactor run_test.py to support reward/loss function selection via config/CLI (l2, l2_white_penalty, etc.)
 - [ ] Add config/CLI option for white penalty alpha and other hyperparameters
 - [ ] Implement function selection logic (dict/factory) in run_test.py
@@ -15,6 +14,7 @@
 - [ ] Update README and docs for new options and usage
 
 ## Completed
+- [x] Modularize run_test.py (was 358 lines, now 46 lines with separate modules)
 - [x] Fix `uv run python run_test.py` execution issue (line_width type error)
 - [x] Add white penalty reward/loss functions to reward.py
 - [x] Add/expand unit tests for all reward/loss functions (normal and error cases)
@@ -28,7 +28,6 @@
 - [ ] Improve CLI help and documentation
 
 ## User Requests (coding agent will broke these down and move to other sections)
-- run_test.pyが長すぎる (358 lines, needs modularization)
 - linewidthの型についての確認 (resolved: kept as int, fixed config.json)
 
 ---

@@ -105,6 +105,9 @@ scripts/test_and_commit.sh "your commit message here"
 - `wanderline/`: Core Python source code.
   - `agent.py`: Contains the logic for choosing drawing angles.
   - `canvas.py`: Manages the drawing canvas and the `apply_stroke` function.
+  - `config_manager.py`: Handles configuration loading and argument parsing.
+  - `run_manager.py`: Manages run setup, resumption, and output handling.
+  - `drawing_engine.py`: Handles the main drawing loop and reward computation.
   - `image_utils.py`: Utilities for loading and handling images.
   - `reward.py`: Calculates the reward (distance) between the canvas and the motif.
   - `video_recorder.py`: Handles recording the drawing process to a video file.
