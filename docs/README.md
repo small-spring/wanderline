@@ -14,9 +14,6 @@ for people
 - [Specification](specification.md)
 - [Configuration Guide](config_guide.md) - How to configure Wanderline with config files and CLI options
 
-
-
-
 ---
 
 Wanderline is an agent that draws images in a one-stroke style based on a given motif image. It outputs drawing angles for each stroke, which can later be used to control devices like robotic arms.
@@ -33,6 +30,23 @@ uv init
 uv env create 3.12
 uv add numpy Pillow opencv-python pytest
 ```
+
+## Configuration
+
+Wanderline can be configured in two ways:
+
+1. **Configuration File**: Create a `config.json` file for repeated use
+   ```zsh
+   cp config.sample.json config.json
+   # Edit config.json with your preferred settings
+   ```
+
+2. **Command-line Arguments**: Override any setting directly
+   ```zsh
+   uv run python run_test.py --steps 500 --greedy
+   ```
+
+For detailed configuration options, see the [Configuration Guide](config_guide.md).
 
 ## Usage
 
