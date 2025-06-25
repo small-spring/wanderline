@@ -15,6 +15,8 @@ This document outlines the coding conventions and workflow guidelines for the Wa
 - **After tests pass, commit your changes.**
 - You can use `scripts/test_and_commit.sh "your commit message"` to automatically run tests and commit if they pass.
     - Example: `scripts/test_and_commit.sh "feat: add white penalty to reward function and tests"`
+- docs/以下を適宜編集し、チャットが新しくなって記憶を失うことに備えてください。
+    - もはや不要であると考えられる内容は、チャットでユーザーに消すことを提案してください。議論の上、了承されたら消して良いです。
 
 Use `uv` for environment setup and package management:
 - `uv run <python_file>`

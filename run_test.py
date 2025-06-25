@@ -48,6 +48,10 @@ def main():
                         help='For early stopping. The minimum change in distance to be considered an improvement.\nDefault is 1e-4.')
     parser.add_argument('--resume_from', type=str, default=None,
                         help="Path to a previous output directory (e.g., 'outputs/20231027_123456').\nThe run will resume from the state saved in that directory, including the canvas, step count, and configuration.")
+    parser.add_argument('--reward-type', type=str, default='l2', choices=['l2', 'l2_white_penalty'],
+                        help='Reward/loss function type to use. Options: l2, l2_white_penalty. Default: l2.')
+    parser.add_argument('--white-penalty-alpha', type=float, default=None,
+                        help='Alpha value for white penalty (only used if reward-type is l2_white_penalty).')
     args = parser.parse_args()
 
     # --- Resume Logic ---
