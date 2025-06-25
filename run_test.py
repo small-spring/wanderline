@@ -26,16 +26,28 @@ def main():
     steps_def = config.get('steps', 100)
     duration_def = config.get('duration', 15.0)
     # parse arguments
-    parser = argparse.ArgumentParser(description="Apply strokes and compute rewards")
-    parser.add_argument('motif_path', nargs='?', default=None, help='Path to motif image')
-    parser.add_argument('--ratio', type=float, default=ratio_def, help='Stroke length ratio of min(width,height)')
-    parser.add_argument('--steps', type=int, default=steps_def, help='Number of strokes to apply (default 100)')
-    parser.add_argument('--duration', type=float, default=duration_def, help='Desired total video duration in seconds')
-    parser.add_argument('--greedy', action='store_true', help='Use greedy agent to choose stroke angles')
-    parser.add_argument('--opacity', type=float, default=1.0, help='Stroke opacity (0.0 to 1.0)')
-    parser.add_argument('--patience', type=int, default=10, help='Early stopping patience in steps. Set to 0 to disable.')
-    parser.add_argument('--min-delta', type=float, default=1e-4, help='Minimum improvement for early stopping.')
-    parser.add_argument('--resume_from', type=str, default=None, help='Path to a previous run directory to resume from.')
+    parser = argparse.ArgumentParser(
+        description="Wanderline: A system for generating single-stroke drawings that mimic a motif image.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument('motif_path', nargs='?', default=None,
+                        help='Path to the motif image file. This is the target image that the agent will try to replicate.\nIf not provided, a blank canvas will be used.')
+    parser.add_argument('--ratio', type=float, default=ratio_def,
+                        help='Length of each stroke as a ratio of the smaller dimension (width or height) of the canvas.\nDefault is based on config.json or 0.2.')
+    parser.add_argument('--steps', type=int, default=steps_def,
+                        help='The total number of strokes to draw on the canvas.\nDefault is based on config.json or 100.')
+    parser.add_argument('--duration', type=float, default=duration_def,
+                        help='The desired duration of the output video in seconds. The frame rate will be adjusted to match this duration.\nDefault is based on config.json or 15.0.')
+    parser.add_argument('--greedy', action='store_true',
+                        help='If set, the agent will use a greedy algorithm to choose the next stroke angle that minimizes the immediate distance to the motif.\nIf not set, angles are chosen randomly.')
+    parser.add_argument('--opacity', type=float, default=1.0,
+                        help='The opacity of each stroke, where 0.0 is fully transparent and 1.0 is fully opaque.\nDefault is 1.0.')
+    parser.add_argument('--patience', type=int, default=10,
+                        help='For early stopping. The number of consecutive steps with no significant improvement (less than `min_delta`) before stopping the run.\nSet to 0 to disable. Default is 10.')
+    parser.add_argument('--min-delta', type=float, default=1e-4,
+                        help='For early stopping. The minimum change in distance to be considered an improvement.\nDefault is 1e-4.')
+    parser.add_argument('--resume_from', type=str, default=None,
+                        help="Path to a previous output directory (e.g., 'outputs/20231027_123456').\nThe run will resume from the state saved in that directory, including the canvas, step count, and configuration.")
     args = parser.parse_args()
 
     # --- Resume Logic ---
@@ -73,6 +85,7 @@ def main():
         if canvas is None:
             print(f"Error: Failed to load canvas from {resume_canvas_path}", file=sys.stderr)
             sys.exit(1)
+        # canvas is now loaded in BGR format, which is what OpenCV uses.
 
         # 4. Load last position
         if 'results' in resume_summary and 'last_position' in resume_summary['results']:
@@ -97,6 +110,56 @@ def main():
                 elif 'total_steps_executed' in resume_summary['results']:
                     previous_total_steps = resume_summary['results']['total_steps_executed']
 
+        # Load the motif image for the resumed run
+        if args.motif_path:
+            try:
+                motif_rgb = load_image(args.motif_path) # Returns RGB
+                motif = cv2.cvtColor(motif_rgb, cv2.COLOR_RGB2BGR) # Convert to BGR for CV2 ops
+            except Exception as e:
+                print(f"Error loading motif image for resumed run: {e}", file=sys.stderr)
+                sys.exit(1)
+
+    # --- New Run Setup ---
+    else:
+        # Not resuming, set up a new run from scratch
+        # 1. Load motif (as RGB first)
+        motif_rgb = None
+        if args.motif_path:
+            if not os.path.isfile(args.motif_path):
+                print(f"Error: motif file '{args.motif_path}' does not exist", file=sys.stderr)
+                sys.exit(1)
+            try:
+                # load_image returns RGB, used for initial analysis (e.g., finding darkest point)
+                motif_rgb = load_image(args.motif_path)
+            except Exception as e:
+                print(f"Error loading motif image: {e}", file=sys.stderr)
+                sys.exit(1)
+
+        # 2. Initialize canvas (as RGB) and determine start point
+        if motif_rgb is not None:
+            # Canvas is white, same size as motif. Stays in RGB for now.
+            canvas_rgb = np.ones_like(motif_rgb, dtype=np.uint8) * 255
+            # Find darkest point from a grayscale version of the RGB motif
+            gray_motif = cv2.cvtColor(motif_rgb, cv2.COLOR_RGB2GRAY)
+            min_loc = np.unravel_index(np.argmin(gray_motif), gray_motif.shape)
+            # np.unravel_index returns (row, col) which is (y, x).
+            current_start = (int(min_loc[1]), int(min_loc[0])) # (x, y)
+            print(f"Starting from the darkest point in motif: {current_start}")
+        else:
+            # Default canvas if no motif
+            canvas_rgb = np.ones((256, 256, 3), dtype=np.uint8) * 255
+            h, w = canvas_rgb.shape[:2]
+            current_start = (w // 2, h // 2)
+
+        # 3. Store a copy of the initial RGB canvas. This is the "master" initial image.
+        initial_canvas = canvas_rgb.copy() # This is a pristine white RGB canvas
+
+        # 4. Convert images to BGR for all OpenCV operations that follow
+        # The main canvas for drawing will be in BGR
+        canvas = cv2.cvtColor(canvas_rgb, cv2.COLOR_RGB2BGR)
+        # The motif for comparison will also be in BGR
+        motif = cv2.cvtColor(motif_rgb, cv2.COLOR_RGB2BGR) if motif_rgb is not None else None
+
     # validate arguments
     if not (0 < args.ratio <= 1):
         print("Error: --ratio must be > 0 and <= 1", file=sys.stderr)
@@ -110,35 +173,17 @@ def main():
     out_dir = os.path.join(base_out, timestamp)
     os.makedirs(out_dir, exist_ok=True)
 
-    # load motif image with error handling
-    motif = None
-    if args.motif_path:
-        if not os.path.isfile(args.motif_path):
-            print(f"Error: motif file '{args.motif_path}' does not exist", file=sys.stderr)
-            sys.exit(1)
-        try:
-            motif = load_image(args.motif_path)
-            # OpenCV uses BGR channel order, but load_image provides RGB.
-            # Convert to BGR for all subsequent cv2 operations.
-            motif = cv2.cvtColor(motif, cv2.COLOR_RGB2BGR)
-        except Exception as e:
-            print(f"Error loading motif image: {e}", file=sys.stderr)
-            sys.exit(1)
+    # If we have a motif, save the BGR version used in the run
+    if motif is not None:
         motif_path_out = os.path.join(out_dir, "motif.png")
         cv2.imwrite(motif_path_out, motif)
         print(f"Motif image saved as {motif_path_out}")
-    # initialize canvas to white (same size as motif if provided)
-    if not args.resume_from:
-        if motif is not None:
-            canvas = np.ones_like(motif, dtype=np.uint8) * 255
-        else:
-            canvas = np.ones((256, 256, 3), dtype=np.uint8) * 255
-        # starting point for strokes: center (一筆書き開始位置)
-        h, w = canvas.shape[:2]
-        current_start = (w // 2, h // 2)
 
-    # store initial blank canvas
-    initial_canvas = canvas.copy()
+    # If resuming, we don't have initial_canvas set. We can create it from the loaded canvas.
+    if args.resume_from:
+        # Create a blank version of the canvas for the "initial_canvas.png" output
+        initial_canvas = np.ones_like(canvas, dtype=np.uint8) * 255
+
     # compute stroke length based on ratio
     h, w = canvas.shape[:2]
     stroke_length = int(min(w, h) * args.ratio)
@@ -161,7 +206,10 @@ def main():
         fps = max(1, int(round(desired_fps)))
         print(f"Computed fps: {desired_fps:.2f}, using integer fps: {fps}")
     recorder = VideoRecorder(video_path, frame_size, fps=fps)
-    recorder.record(initial_canvas)
+    # The canvas is now in BGR format, which is what VideoWriter expects.
+    # For a new run, it's a blank white BGR canvas. For a resumed run, it's the loaded final_canvas.png.
+    recorder.record(canvas)
+
     # track loss (distance) over frames
     distances = initial_distances.copy()
     best_distance = min(distances) if distances else math.inf
@@ -218,7 +266,15 @@ def main():
 
     # save initial blank canvas image
     in_path = os.path.join(out_dir, "initial_canvas.png")
-    cv2.imwrite(in_path, initial_canvas)
+    # initial_canvas was stored as RGB for new runs, but created as BGR for resumed runs.
+    # To be safe, we assume it could be RGB and convert to BGR for cv2.imwrite.
+    # If it's already BGR, this specific conversion (RGB->BGR) might not be ideal but often works visually.
+    # A cleaner way would be to ensure it's always RGB until this point.
+    # For now, we handle the new-run case correctly.
+    if not args.resume_from:
+        cv2.imwrite(in_path, cv2.cvtColor(initial_canvas, cv2.COLOR_RGB2BGR))
+    else:
+        cv2.imwrite(in_path, initial_canvas) # Already BGR
     print(f"Initial canvas image saved as {in_path}")
 
     # save final canvas image

@@ -13,6 +13,6 @@ def l2_distance(a: np.ndarray, b: np.ndarray) -> float:
 def compute_reward(prev_state: np.ndarray, next_state: np.ndarray, motif: np.ndarray) -> float:
     """
     Immediate reward: reduction in distance to motif.
-      Δd = d(prev_state, motif) - d(next_state, motif)
+        Δd = d(prev_state, motif) - d(next_state, motif)
     """
     return l2_distance(prev_state, motif) - l2_distance(next_state, motif)

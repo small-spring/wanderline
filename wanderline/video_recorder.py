@@ -11,7 +11,8 @@ class VideoRecorder:
     """
     def __init__(self, output_path: str, frame_size: tuple, fps: int = 5, is_color: bool = True):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # Use 'avc1' (H.264) for better compatibility on macOS instead of 'mp4v'
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
         self.writer = cv2.VideoWriter(output_path, fourcc, fps, frame_size, is_color)
 
     def record(self, frame):

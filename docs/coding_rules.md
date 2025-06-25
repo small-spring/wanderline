@@ -11,6 +11,7 @@ This document outlines the coding conventions and workflow guidelines for the Wa
 - After editing, run using `uv run`.
 - Make small incremental changes and run tests frequently.
 - After implementation, execute the code.
+- Pay attention to code quality. Consider modularizing code if it exceeds 150 lines.
 
 Use `uv` for environment setup and package management:
 - `uv run <python_file>`
