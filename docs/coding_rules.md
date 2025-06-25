@@ -13,7 +13,8 @@ This document outlines the coding conventions and workflow guidelines for the Wa
 - After implementation, execute the code.
 - Pay attention to code quality. Consider modularizing code if it exceeds 150 lines.
 - **After tests pass, commit your changes.**
-- You can use `scripts/test_and_commit.sh` to automatically run tests and commit if they pass.
+- You can use `scripts/test_and_commit.sh "your commit message"` to automatically run tests and commit if they pass.
+    - Example: `scripts/test_and_commit.sh "feat: add white penalty to reward function and tests"`
 
 Use `uv` for environment setup and package management:
 - `uv run <python_file>`

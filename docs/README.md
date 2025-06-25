@@ -69,6 +69,17 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
 uv run pytest
 ```
 
+## Automated Test & Commit
+
+You can use the following script to automatically run all tests and commit your changes if they pass:
+
+```zsh
+scripts/test_and_commit.sh "your commit message here"
+```
+
+- Replace `"your commit message here"` with a short description of your changes.
+- If tests fail, no commit will be made.
+
 ## Project Structure
 
 - `wanderline/`: Core Python source code.
