@@ -1,4 +1,4 @@
-# Coding Rules
+# Coding Rules for Coding Agent
 
 This document outlines the coding conventions and workflow guidelines for the Wanderline project.
 

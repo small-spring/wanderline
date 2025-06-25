@@ -17,7 +17,15 @@ import datetime
 def main():
     # load config
     config = {}
-    cfg_file = os.path.join(os.getcwd(), 'config.json')
+    parser = argparse.ArgumentParser(
+        description="Wanderline: A system for generating single-stroke drawings that mimic a motif image.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    parser.add_argument('--config', type=str, default=None,
+                        help='Path to config JSON file. If not set, uses ./config.json if present.')
+    # parse only --config first
+    args_pre, _ = parser.parse_known_args()
+    cfg_file = args_pre.config if args_pre.config else os.path.join(os.getcwd(), 'config.json')
     if os.path.isfile(cfg_file):
         with open(cfg_file, 'r') as f:
             config = json.load(f)
@@ -51,6 +59,8 @@ def main():
                         help='Reward/loss function type to use. Options: l2, l2_white_penalty. Default: l2.')
     parser.add_argument('--white-penalty-alpha', type=float, default=None,
                         help='Alpha value for white penalty (only used if reward-type is l2_white_penalty).')
+    parser.add_argument('--line-width', type=int, default=int(config.get('line_width', 3)),
+                        help='Stroke thickness (line width) for drawing. Default is from config.json or 3.')
     args = parser.parse_args()
 
     # --- Resume Logic ---
@@ -253,7 +263,7 @@ def main():
                 angle = choose_next_angle(prev_canvas, motif, current_start, stroke_length)
             else:
                 angle = random.uniform(0, 2 * math.pi)
-            next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=current_start, length=stroke_length, opacity=args.opacity, return_end=True)
+            next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=current_start, length=stroke_length, opacity=args.opacity, return_end=True, line_width=args.line_width)
         except Exception as e:
             print(f"Error during stroke application at step {i+1}: {e}", file=sys.stderr)
             sys.exit(1)

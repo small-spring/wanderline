@@ -21,6 +21,11 @@
 - [ ] Add more advanced agent strategies (non-greedy, RL, etc.)
 - [ ] Improve CLI help and documentation
 
+## User Requests (to be broken down and moved to other sections)
+- `uv run python run_test.py` だけで動かないのでそれを直したい。
+- run_test.pyが長すぎる
+- linewidthはintである必要はない気がする。linewidthを最終的に使っているところを特定し、確認したい
+
 ---
 
 *Update this file as tasks are added, started, or completed. Use checkboxes to track progress.*

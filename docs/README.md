@@ -4,10 +4,17 @@
 
 This folder contains the following documentation files:
 
+for coding agent
+- [TODO](TODO.md)
+- [Coding Rules](coding_rules.md) 
+    - First, please review and restate the coding rules!
+
+for people
 - [Overview](README.md)
-- [Coding Rules](coding_rules.md)
 - [Specification](specification.md)
-- [Detailed Design](detailed_design.md)
+
+
+
 
 ---
 
@@ -46,6 +53,9 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
 - `--patience <int>`: Early stopping patience. The number of steps with no significant improvement before stopping. Set to `0` to disable. Default: `10`.
 - `--min-delta <float>`: The minimum change in distance to be considered an improvement for early stopping. Default: `1e-4`.
 - `--resume_from <path>`: Path to a previous output directory (e.g., `outputs/20231027_123456`) to resume a run.
+- `--line-width <int>`: Stroke thickness (line width) for drawing. Default: from config.json or 3.
+- `--reward-type <str>`: Reward/loss function type to use. Options: `l2`, `l2_white_penalty`. Default: `l2`.
+- `--white-penalty-alpha <float>`: Alpha value for white penalty (only used if `--reward-type` is `l2_white_penalty`).
 
 ### Example Commands
 
@@ -59,9 +69,19 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
     uv run python run_test.py assets/sample.png --steps 500 --greedy --opacity 0.5 --patience 20
     ```
 
-3.  **Resume a previous run and add 500 more steps:**
+3.  **Run with white penalty reward function:**
+    ```zsh
+    uv run python run_test.py assets/sample.png --reward-type l2_white_penalty --white-penalty-alpha 0.1
+    ```
+
+4.  **Resume a previous run and add 500 more steps:**
     ```zsh
     uv run python run_test.py --resume_from outputs/20231105_103000 --steps 500
+    ```
+
+5.  **Basic run with a motif and custom line width:**
+    ```zsh
+    uv run python run_test.py assets/sample.png --line-width 5
     ```
 
 ## Run all tests
