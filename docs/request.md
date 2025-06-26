@@ -6,3 +6,6 @@ Primary objective: Handle user requests for the coding agent.
 
 ## User's request
 *New requests can be added below and will be processed into TODO.md*
+
+### OpenCV Window Display Issues  
+- デフォルトjsonを、movieを後からreconstructするべきかもしれない。ultrathinkが必要

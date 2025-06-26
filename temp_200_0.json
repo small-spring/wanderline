@@ -1,0 +1,1 @@
+{"memory_efficient": false, "steps": 200, "motif_path": "assets/sample.png", "ratio": 0.1, "duration": 5.0, "opacity": 0.3, "line_width": 2, "greedy": true, "lookahead_depth": 1, "n_samples": 36, "verbose": false, "headless": true}

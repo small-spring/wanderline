@@ -42,13 +42,17 @@ class RealtimeVisualizer:
         self.enabled = config.get('enabled', False)
         self.mode = config.get('mode', 'opencv')
         self.update_frequency = config.get('update_frequency', 10)
-        self.window_size = tuple(config.get('window_size', [800, 600]))
+        self.default_window_size = tuple(config.get('window_size', [800, 600]))
+        self.max_window_width = config.get('max_window_width', 1000)
+        self.max_window_height = config.get('max_window_height', 800)
+        self.window_size = self.default_window_size  # Will be updated dynamically
         self.save_snapshots = config.get('save_snapshots', False)
         self.snapshot_interval = config.get('snapshot_interval', 100)
         
         # State tracking
         self.step_count = 0
         self.previous_total_steps = 0
+        self.total_steps = 0
         self.start_time = time.time()
         self.last_update_time = time.time()
         self.window_name = "Wanderline - Live Drawing"
@@ -77,15 +81,15 @@ class RealtimeVisualizer:
         try:
             # Create window with specific flags for better compatibility
             cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-            cv2.resizeWindow(self.window_name, *self.window_size)
+            cv2.resizeWindow(self.window_name, *self.default_window_size)
             
             # Create and display initial placeholder image
-            placeholder = np.ones((self.window_size[1], self.window_size[0], 3), dtype=np.uint8) * 50
-            cv2.putText(placeholder, "Wanderline - Starting...", (50, self.window_size[1]//2), 
+            placeholder = np.ones((self.default_window_size[1], self.default_window_size[0], 3), dtype=np.uint8) * 50
+            cv2.putText(placeholder, "Wanderline - Starting...", (50, self.default_window_size[1]//2), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            cv2.putText(placeholder, "Press 'q' to quit", (50, self.window_size[1]//2 + 50), 
+            cv2.putText(placeholder, "Press 'q' to quit", (50, self.default_window_size[1]//2 + 50), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
-            cv2.putText(placeholder, "Window should be visible now", (50, self.window_size[1]//2 + 100), 
+            cv2.putText(placeholder, "Window should be visible now", (50, self.default_window_size[1]//2 + 100), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 2)
             
             cv2.imshow(self.window_name, placeholder)
@@ -96,7 +100,7 @@ class RealtimeVisualizer:
             cv2.setWindowProperty(self.window_name, cv2.WND_PROP_TOPMOST, 0)
             
             self.window_created = True
-            print(f"OpenCV live window initialized: {self.window_size}")
+            print(f"OpenCV live window initialized: {self.default_window_size}")
             print("If you cannot see the window, check if it's hidden behind other windows")
         except Exception as e:
             print(f"Failed to initialize OpenCV window: {e}")
@@ -113,6 +117,10 @@ class RealtimeVisualizer:
     def set_previous_total_steps(self, previous_steps: int):
         """Set the number of steps from previous runs for display purposes."""
         self.previous_total_steps = previous_steps
+    
+    def set_total_steps(self, total_steps: int):
+        """Set the total number of steps for this run."""
+        self.total_steps = total_steps
     
     def update(self, canvas: np.ndarray, step: int, distance: float = None, 
                reward: float = None, angle: float = None, force_update: bool = False):
@@ -163,6 +171,22 @@ class RealtimeVisualizer:
         
         self.last_update_time = current_time
     
+    def _calculate_optimal_window_size(self, canvas_shape):
+        """Calculate optimal window size that preserves aspect ratio within constraints."""
+        h, w = canvas_shape[:2]
+        aspect_ratio = w / h
+        
+        # Try fitting to max width first
+        new_w = min(self.max_window_width, w)
+        new_h = int(new_w / aspect_ratio)
+        
+        # If height exceeds limit, fit to max height instead
+        if new_h > self.max_window_height:
+            new_h = self.max_window_height
+            new_w = int(new_h * aspect_ratio)
+        
+        return (new_w, new_h)
+    
     def _update_opencv_display(self, canvas: np.ndarray, step: int, 
                               distance: float = None, reward: float = None, angle: float = None):
         """Update OpenCV window with current canvas and metrics."""
@@ -170,7 +194,14 @@ class RealtimeVisualizer:
             # Create display canvas with info overlay
             display_canvas = self._create_info_overlay(canvas, step, distance, reward, angle)
             
-            # Resize to window size if needed
+            # Calculate and set optimal window size for this canvas
+            optimal_size = self._calculate_optimal_window_size(display_canvas.shape)
+            if optimal_size != self.window_size:
+                self.window_size = optimal_size
+                cv2.resizeWindow(self.window_name, *self.window_size)
+                print(f"📐 Window resized to {self.window_size} (aspect ratio preserved)")
+            
+            # Resize canvas to fit window while preserving aspect ratio
             h, w = display_canvas.shape[:2]
             if (w, h) != self.window_size:
                 display_canvas = cv2.resize(display_canvas, self.window_size)
@@ -188,9 +219,6 @@ class RealtimeVisualizer:
                 self.show_overlay = not self.show_overlay
                 status = "shown" if self.show_overlay else "hidden"
                 print(f"\n👁️  Text overlay {status}\n")
-            elif key == ord('p') and self.output_dir:  # 'p' to print full output path
-                print(f"\n📁 Output directory: {self.output_dir}")
-                print(f"   Full path copied to console ☝️\n")
                 
         except Exception as e:
             print(f"Error updating OpenCV display: {e}")
@@ -217,7 +245,7 @@ class RealtimeVisualizer:
         # Add step info if overlay enabled
         if self.show_overlay:
             info_lines.extend([
-                f"Step: ({self.previous_total_steps} +) {step}" if self.previous_total_steps > 0 else f"Step: {step}",
+                f"Step: {step}/{self.total_steps}" if self.total_steps > 0 else f"Step: {step}",
                 f"Time: {elapsed_time:.1f}s",
                 f"Speed: {steps_per_sec:.1f} steps/s"
             ])
@@ -249,7 +277,7 @@ class RealtimeVisualizer:
         # Add controls hint at bottom if overlay enabled
         if self.show_overlay:
             h, w = display_canvas.shape[:2]
-            controls_text = "Controls: 'q' = quit, 's' = save, 'h' = hide/show overlay, 'p' = print path"
+            controls_text = "Controls: 'q' = quit, 's' = save, 'h' = hide/show overlay"
             cv2.putText(display_canvas, controls_text, (11, h - 19), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             cv2.putText(display_canvas, controls_text, (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         

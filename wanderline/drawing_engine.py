@@ -1,6 +1,7 @@
 import sys
 import random
 import math
+import signal
 import numpy as np
 from wanderline.canvas import apply_stroke
 from wanderline.agent import choose_next_angle
@@ -21,6 +22,10 @@ class DrawingEngine:
     
     def __init__(self, args):
         self.args = args
+        self.shutdown_requested = False
+        
+        # Setup signal handlers for graceful interruption
+        self.setup_signal_handlers()
         
         # Determine white penalty parameters
         white_penalty = getattr(args, 'white_penalty', None)
@@ -61,6 +66,17 @@ class DrawingEngine:
                 'snapshot_interval': 100
             }
             self.visualizer = RealtimeVisualizer(default_viz_config)
+    
+    def setup_signal_handlers(self):
+        """Setup signal handlers for graceful interruption."""
+        signal.signal(signal.SIGINT, self._handle_interrupt)
+        signal.signal(signal.SIGTERM, self._handle_interrupt)
+    
+    def _handle_interrupt(self, signum, frame):
+        """Handle interrupt signals (Ctrl+C, SIGTERM) gracefully."""
+        print("\n🛑 Interrupt received - requesting graceful shutdown...")
+        print("   Current progress will be saved. Please wait...")
+        self.shutdown_requested = True
     
     def setup_video_recording(self, canvas, out_dir):
         """
@@ -134,6 +150,7 @@ class DrawingEngine:
         if out_dir:
             self.visualizer.setup_snapshot_dir(out_dir)
         self.visualizer.set_previous_total_steps(previous_total_steps)
+        self.visualizer.set_total_steps(self.args.steps)
         
         # Compute stroke length based on ratio
         h, w = canvas.shape[:2]
@@ -163,6 +180,11 @@ class DrawingEngine:
         executed_steps = 0
         
         for i in range(self.args.steps):
+            # Check for graceful shutdown request
+            if self.shutdown_requested:
+                print(f"💾 Graceful shutdown requested at step {i+1}/{self.args.steps}")
+                break
+            
             try:
                 if self.agent_type == 'transformer' and motif is not None:
                     angle = self.agent.choose_next_angle(prev_canvas, motif, current_start, stroke_length)

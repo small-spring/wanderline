@@ -14,7 +14,8 @@
       "Bash(find:*)",
       "Bash(PYTHONPATH=. uv run python config_spec.py)",
       "Bash(PYTHONPATH=. uv run pytest tests/test_practical_config.py -v)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(timeout 3s uv run:*)"
     ],
     "deny": []
   }

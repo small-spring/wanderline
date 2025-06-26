@@ -1,5 +1,55 @@
 # TODO / Task List for Wanderline
 
+## 🚨 CODE CONSERVATION EMERGENCY
+
+**CRITICAL PRIORITY**: Address severe resource waste before any new features.
+
+### Phase 1: Immediate Waste Elimination (URGENT)
+**Start here - Low risk, high impact**
+
+1. **Remove 5 Redundant Implementations** ⚡ START HERE
+   - Delete: `_choose_next_angle_greedy()`, `_choose_next_angle_lookahead()` in agent.py  
+   - Delete: `choose_next_angle_vectorized()`, `choose_next_angle_vectorized_lookahead()` 
+   - Keep only: Memory-efficient variants from memory_efficient_canvas.py
+   - **Expected**: 65% code reduction (~900 lines removed)
+
+2. **Configuration Explosion Cleanup**
+   - Remove: `use_vectorized`, `use_full_vectorization`, `adaptive_sampling`, etc.
+   - Keep only: `memory_efficient`, `steps`, `opacity`, `duration` (essential 10)
+   - **Expected**: 35+ parameters → 10 parameters
+
+3. **Delete Workaround Files**
+   - Delete: `fast_agent.py` (324 lines of workarounds)
+   - Integrate memory-efficient logic directly into agent.py
+   - **Expected**: 324 lines eliminated
+
+### Phase 2: Architecture Reform (STRATEGIC)
+**After Phase 1 stabilizes**
+
+4. **Root Cause Fix: Canvas→Stroke Architecture**
+   - Replace: Full canvas copying with incremental pixel evaluation
+   - Redesign: `apply_stroke()` to return affected pixel coordinates only
+   - **Expected**: 15,000x memory reduction, 2-3x speed improvement
+
+5. **Single Algorithm Path**
+   - Unify all angle selection into one well-designed implementation
+   - Remove complex routing logic in `choose_next_angle()`
+   - **Expected**: Eliminate function call overhead, cleaner codebase
+
+### Success Metrics
+- [ ] Memory usage: <1MB per stroke (from 208MB)
+- [ ] Code size: <1000 lines in agent system (from 2776)
+- [ ] Configuration: <10 parameters (from 45+)
+- [ ] Performance: 2x faster than current "optimized" mode
+
+### Risk Assessment
+- **Phase 1**: LOW RISK - Just removing redundant code
+- **Phase 2**: MEDIUM RISK - Architectural changes, needs testing
+
+**RECOMMENDATION**: Start with #1 (Remove redundant implementations) TODAY.
+
+---
+
 ## Purpose & Guidelines
 
 This document tracks development tasks for the Wanderline project, organized by implementation stage to clarify what needs discussion versus what's ready for implementation.
@@ -30,6 +80,25 @@ Use clear, concise descriptions with technical details when needed. Include:
 ---
 
 ## Discussion Needed
+
+### OpenCV Window Display Issues
+**Context**: Current real-time visualization has UI/display problems affecting user experience.
+
+**Specific Issues**:
+1. ~~**Aspect Ratio Distortion**: OpenCV window displays with incorrect aspect ratio~~ ✅ **COMPLETED**
+   - **Solution implemented**: Smart dynamic window sizing with aspect ratio preservation
+   - **Features**: 
+     - Automatically calculates optimal window size based on canvas aspect ratio
+     - Respects maximum constraints (1000×800) to prevent oversized windows
+     - Preserves perfect aspect ratio for all motif types (4:3, 16:9, 3:2, etc.)
+     - Provides user feedback when window is resized
+   - **Tested with**: Default sample (4:3), sample3.png (16:9), sample2.png (3:2)
+
+2. ~~**UI Text Cleanup**: Remove unwanted "p option (print path)" text from OpenCV window~~ ✅ **COMPLETED**
+   - Removed 'p' key handler and updated controls text in realtime_visualizer.py
+   - Enhanced step display to show "current/total" format matching terminal output
+
+**Status**: ✅ **ALL ISSUES RESOLVED** - OpenCV window now displays with perfect aspect ratio and clean interface
 
 ### Advanced Optimization Strategies
 **Context**: Core performance bottlenecks have been addressed. Consider advanced methods for further optimization.
@@ -166,6 +235,15 @@ Use clear, concise descriptions with technical details when needed. Include:
 - **README**: Reorganizing project structure documentation
 
 ## Completed
+
+### Interrupt Handling System (2025-06-26)
+- **Signal Handlers**: Added SIGINT/SIGTERM handling to DrawingEngine for graceful shutdown on Ctrl+C
+- **State Preservation**: Interruptions trigger immediate state saving using existing resume infrastructure  
+- **User Feedback**: Clear messages indicating progress is being saved and how to resume
+- **Pytest Integration**: Comprehensive test suite covering signal handling, graceful shutdown, and resume workflow
+- **PYTHONPATH Resolution**: Added conftest.py and pytest.ini to automatically resolve import paths for all tests
+- **Zero Performance Impact**: Signal handlers only activate during interruption, no overhead during normal operation
+- **Resume Compatibility**: Interrupted runs generate identical state files to normal runs, full resume functionality
 
 ### Tensor Performance Analysis (2025-06-26)
 - **Hypothesis Testing**: Confirmed that tensor calculations are NOT effective in current implementation

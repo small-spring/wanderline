@@ -31,15 +31,37 @@ def main():
     recorder, frames_to_record, video_path = drawing_engine.setup_video_recording(canvas, out_dir)
     
     # Execute main drawing loop
-    final_canvas, distances, total_reward, final_position, converged, executed_steps = drawing_engine.run_drawing_loop(
-        canvas, motif, current_start, run_manager.initial_distances, recorder, frames_to_record, initial_canvas, out_dir, run_manager.previous_total_steps
-    )
-    
-    # Finalize outputs
-    drawing_engine.finalize_outputs(distances, out_dir, video_path, recorder)
-    
-    # Save all results
-    run_manager.save_results(final_canvas, initial_canvas, distances, total_reward, final_position, converged, executed_steps)
+    try:
+        final_canvas, distances, total_reward, final_position, converged, executed_steps = drawing_engine.run_drawing_loop(
+            canvas, motif, current_start, run_manager.initial_distances, recorder, frames_to_record, initial_canvas, out_dir, run_manager.previous_total_steps
+        )
+        
+        # Finalize outputs (but skip video finalization if interrupted)
+        if not drawing_engine.shutdown_requested:
+            drawing_engine.finalize_outputs(distances, out_dir, video_path, recorder)
+        else:
+            # For interrupted runs, just plot distances
+            if distances:
+                from wanderline.plot_utils import plot_distances
+                plot_distances(distances, out_dir)
+        
+        # Save all results
+        run_manager.save_results(final_canvas, initial_canvas, distances, total_reward, final_position, converged, executed_steps)
+        
+        if drawing_engine.shutdown_requested:
+            print("✅ Drawing interrupted but state saved successfully!")
+            print(f"📁 Resume with: --resume_from {out_dir}")
+        
+    except KeyboardInterrupt:
+        # Fallback in case signal handler doesn't work
+        print("\n🛑 KeyboardInterrupt caught - saving current state...")
+        if 'final_canvas' in locals():
+            run_manager.save_results(final_canvas, initial_canvas, distances, total_reward, final_position, False, executed_steps)
+            print("✅ Current state saved!")
+            print(f"📁 Resume with: --resume_from {out_dir}")
+        else:
+            print("❌ Unable to save state - no progress to save")
+        raise
 
 
 if __name__ == "__main__":

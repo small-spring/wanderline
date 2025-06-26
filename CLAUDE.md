@@ -9,8 +9,9 @@ Wanderline is a single-stroke drawing agent that generates drawings based on mot
 ## Development Commands
 
 ### Testing and Building
-- `uv run pytest` - Run all tests
+- `uv run pytest` - Run all tests (includes automatic PYTHONPATH resolution)
 - `uv run pytest tests/test_<module>.py` - Run specific test file
+- `uv run pytest tests/test_interrupt_handling.py` - Test interrupt handling system
 - `scripts/test_and_commit.sh "commit message"` - Run tests and commit if they pass
 
 ### Running the Application
@@ -41,6 +42,31 @@ Wanderline is a single-stroke drawing agent that generates drawings based on mot
 - `uv init` - Initialize project
 - `uv env create 3.12` - Create Python 3.12 environment
 - `uv add <package>` - Add dependencies
+
+## 🚨 CRITICAL CONSERVATION WARNINGS
+
+**STOP: Read this before making any changes to the codebase**
+
+### Severe Resource Waste Identified (2025-06-26)
+This codebase has **critical conservation violations** that must be addressed:
+
+1. **15,000x Memory Waste**: Canvas-centric design creates catastrophic memory overhead
+   - Current: 36 full canvas copies (52M pixels) per stroke decision  
+   - Root cause: `np.tile(state[np.newaxis, :, :, :], (n_samples, 1, 1, 1))` in canvas.py:85
+   - Impact: 208MB memory for single stroke vs. 14KB for efficient approach
+
+2. **Implementation Explosion**: 7 different ways to do the same angle selection task
+   - Total redundant code: ~1,400 lines where 200 would suffice
+   - Files: agent.py, fast_agent.py, memory_efficient_canvas.py
+
+3. **Configuration Explosion**: 45+ parameters to route between redundant implementations
+
+4. **Performance Anti-Pattern**: "Vectorized" approach is 0.67x SLOWER than sequential
+
+### Immediate Action Required
+See docs/TODO.md "Code Conservation Emergency" section for prioritized action plan.
+
+**Rule**: No new features until conservation violations are addressed.
 
 ## Architecture Overview
 
@@ -118,6 +144,33 @@ Located in `configs/`:
 - `quick_test_2step.json` - Multi-step lookahead test configuration
 - `long_run.json` - Extended run settings with memory-efficient mode (10,000+ steps)
 
+## Interruption and Resume System
+
+### Graceful Interruption
+- **Ctrl+C (SIGINT)**: Triggers graceful shutdown with state saving
+- **SIGTERM**: Also handled for clean termination
+- **Automatic State Saving**: Progress automatically saved on interruption
+- **Zero Overhead**: Signal handlers only activate during interruption
+
+### Resume Functionality
+- **Resume Command**: `uv run python run_test.py --resume_from outputs/TIMESTAMP`
+- **State Preservation**: Canvas, position, distances, and configuration all saved
+- **Seamless Continuation**: Resumed runs continue exactly where interrupted
+- **Compatible with All Modes**: Works with memory-efficient, ultra-fast, and standard modes
+
+### Example Workflow
+```bash
+# Start long run
+uv run python run_test.py --steps 10000 --greedy --memory-efficient
+
+# Press Ctrl+C at any time - progress is automatically saved
+# Output: "✅ Drawing interrupted but state saved successfully!"
+# Output: "📁 Resume with: --resume_from outputs/20231027_143022"
+
+# Resume from where you left off
+uv run python run_test.py --resume_from outputs/20231027_143022 --steps 5000
+```
+
 ## Output Structure
 
 Each run creates a timestamped directory in `outputs/` containing:
@@ -125,13 +178,26 @@ Each run creates a timestamped directory in `outputs/` containing:
 - `final_canvas.png` - Final result
 - `motif.png` - Target image
 - `distance_curve.png` - Convergence plot
-- `run_summary.json` - Run metadata
+- `run_summary.json` - Run metadata (includes resume information)
 
 ## Development Guidelines
 
 - Use `uv run` for all Python execution
 - Follow the test-and-commit workflow via `scripts/test_and_commit.sh`
+- **Testing**: All tests auto-resolve PYTHONPATH via `conftest.py` - no manual setup needed
 - Keep functions under 150 lines; modularize larger code
 - Use vectorized operations for performance-critical paths
 - English-only comments and documentation
 - Clear, descriptive variable names
+
+## Testing Infrastructure
+
+### Automatic Path Resolution
+- **conftest.py**: Automatically resolves Python import paths for all tests
+- **pytest.ini**: Configures test discovery and custom markers
+- **No PYTHONPATH needed**: Tests work in any environment without manual setup
+
+### Test Categories
+- **Unit Tests**: Individual component testing (canvas, reward, agent)
+- **Integration Tests**: End-to-end workflow testing (marked with `@pytest.mark.integration`)
+- **Interrupt Tests**: Signal handling and graceful shutdown testing
