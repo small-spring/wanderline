@@ -3,6 +3,7 @@ import math
 import time
 from wanderline.canvas import apply_stroke, apply_stroke_vectorized
 from wanderline.reward import compute_reward, compute_reward_vectorized, compute_reward_with_white_penalty_vectorized
+from wanderline.memory_efficient_canvas import choose_angle_memory_efficient
 
 def choose_next_angle(
         prev_canvas: np.ndarray,
@@ -43,59 +44,90 @@ def choose_next_angle(
     Returns:
         Best angle (in radians)
     """
-    if use_vectorized:
-        if lookahead_depth == 1:
-            result, timing_info = choose_next_angle_vectorized(
-                prev_canvas, motif, start_pt, length, n_samples,
-                reward_type, white_penalty, opacity, line_width, verbose
-            )
-            if verbose and timing_info:
-                print(f"1-step vectorized: {timing_info['n_samples']} samples in {timing_info['total_time']:.3f}s")
-            return result
-        elif lookahead_depth == 2 and use_full_vectorization:
-            # Use vectorized lookahead for 2-step (full vectorization removed for simplicity)
-            result = choose_next_angle_vectorized_lookahead(
-                prev_canvas, motif, start_pt, length, n_samples, 2,
-                reward_type, white_penalty, opacity, line_width
-            )
-            return result
-        else:
-            return choose_next_angle_vectorized_lookahead(
-                prev_canvas, motif, start_pt, length, n_samples, lookahead_depth,
-                reward_type, white_penalty, opacity, line_width
-            )
+    # Always use memory-efficient implementation for best performance
+    # (Previous vectorized implementations had 36x memory overhead)
+    if lookahead_depth == 1:
+        result, timing_info = choose_angle_memory_efficient(
+            prev_canvas, motif, start_pt, length, n_samples,
+            reward_type, white_penalty, opacity, line_width, 
+            progressive_refinement=True, verbose=verbose
+        )
+        if verbose and timing_info:
+            print(f"Memory-efficient: {timing_info.get('n_samples', n_samples)} samples in {timing_info.get('total_time', 0):.3f}s")
+        return result
     else:
-        # Use original sequential implementation
-        if lookahead_depth == 1:
-            return _choose_next_angle_greedy(prev_canvas, motif, start_pt, length, n_samples)
-        else:
-            return _choose_next_angle_lookahead(prev_canvas, motif, start_pt, length, n_samples, lookahead_depth)
+        # Multi-step lookahead: use recursive approach with memory-efficient single steps
+        best_angle = 0.0
+        best_total_reward = -math.inf
+        
+        # Reduce sample count for multi-step to avoid exponential explosion
+        effective_samples = min(n_samples, 12) if lookahead_depth > 1 else n_samples
+        
+        for angle in np.linspace(0, 2 * math.pi, effective_samples, endpoint=False):
+            try:
+                next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=start_pt, length=length, return_end=True)
+                immediate_reward = compute_reward(prev_canvas, next_canvas, motif)
+                
+                if lookahead_depth <= 1:
+                    total_reward = immediate_reward
+                else:
+                    # Recursively evaluate future steps using memory-efficient approach
+                    future_reward = _evaluate_future_reward_memory_efficient(
+                        next_canvas, motif, end_pt, length, effective_samples, lookahead_depth - 1,
+                        reward_type, white_penalty, opacity, line_width
+                    )
+                    total_reward = immediate_reward + future_reward
+                
+                if total_reward > best_total_reward:
+                    best_total_reward = total_reward
+                    best_angle = float(angle)
+            except Exception:
+                continue
+        
+        return best_angle
 
-def _choose_next_angle_greedy(
-        prev_canvas: np.ndarray,
+def _evaluate_future_reward_memory_efficient(
+        canvas: np.ndarray,
         motif: np.ndarray,
         start_pt: tuple[int, int],
         length: int,
-        n_samples: int = 36
+        n_samples: int,
+        lookahead_depth: int,
+        reward_type: str = 'l2',
+        white_penalty: float = None,
+        opacity: float = 1.0,
+        line_width: int = 3
         ) -> float:
     """
-    Choose the angle that maximizes immediate reward (1-step lookahead).
-    
-    Sequential implementation that samples n_samples angles uniformly from [0, 2*pi).
-    This is the reference implementation for testing vectorized versions.
+    Evaluate future reward using memory-efficient approach.
     """
-    best_angle = 0.0
-    best_reward = -math.inf
+    if lookahead_depth <= 0:
+        return 0.0
+    
+    best_future_reward = -math.inf
+    
     for angle in np.linspace(0, 2 * math.pi, n_samples, endpoint=False):
         try:
-            next_canvas, _ = apply_stroke(prev_canvas, angle, start=start_pt, length=length, return_end=True)
-            r = compute_reward(prev_canvas, next_canvas, motif)
+            next_canvas, end_pt = apply_stroke(canvas, angle, start=start_pt, length=length, return_end=True)
+            immediate_reward = compute_reward(canvas, next_canvas, motif)
+            
+            if lookahead_depth <= 1:
+                future_reward = immediate_reward
+            else:
+                future_reward = immediate_reward + _evaluate_future_reward_memory_efficient(
+                    next_canvas, motif, end_pt, length, n_samples, lookahead_depth - 1,
+                    reward_type, white_penalty, opacity, line_width
+                )
+            
+            if future_reward > best_future_reward:
+                best_future_reward = future_reward
         except Exception:
             continue
-        if r > best_reward:
-            best_reward = r
-            best_angle = float(angle)
-    return best_angle
+    
+    return best_future_reward
+
+# REMOVED: _choose_next_angle_greedy() - redundant implementation 
+# Used memory-efficient approach instead (see conservation_analysis.md)
 
 def _choose_next_angle_lookahead(
         prev_canvas: np.ndarray,

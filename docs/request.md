@@ -9,3 +9,4 @@ Primary objective: Handle user requests for the coding agent.
 
 ### OpenCV Window Display Issues  
 - デフォルトjsonを、movieを後からreconstructするべきかもしれない。ultrathinkが必要
+- テストrunで出てきたoutputファイルがかなりとっ散らかっている。outputを整理するにはどするのがよいか？
