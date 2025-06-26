@@ -129,43 +129,8 @@ def _evaluate_future_reward_memory_efficient(
 # REMOVED: _choose_next_angle_greedy() - redundant implementation 
 # Used memory-efficient approach instead (see conservation_analysis.md)
 
-def _choose_next_angle_lookahead(
-        prev_canvas: np.ndarray,
-        motif: np.ndarray,
-        start_pt: tuple[int, int],
-        length: int,
-        n_samples: int,
-        lookahead_depth: int
-        ) -> float:
-    """
-    Choose the angle that maximizes cumulative reward over multiple steps.
-    Uses recursive lookahead to evaluate action sequences.
-    """
-    best_angle = 0.0
-    best_total_reward = -math.inf
-    
-    for angle in np.linspace(0, 2 * math.pi, n_samples, endpoint=False):
-        try:
-            next_canvas, end_pt = apply_stroke(prev_canvas, angle, start=start_pt, length=length, return_end=True)
-            immediate_reward = compute_reward(prev_canvas, next_canvas, motif)
-            
-            if lookahead_depth <= 1:
-                total_reward = immediate_reward
-            else:
-                # Recursively evaluate future steps
-                future_reward = _evaluate_future_reward(
-                    next_canvas, motif, end_pt, length, n_samples, lookahead_depth - 1
-                )
-                total_reward = immediate_reward + future_reward
-            
-        except Exception:
-            continue
-            
-        if total_reward > best_total_reward:
-            best_total_reward = total_reward
-            best_angle = float(angle)
-    
-    return best_angle
+# REMOVED: _choose_next_angle_lookahead() - redundant implementation
+# Multi-step lookahead now handled in main choose_next_angle() function
 
 def _evaluate_future_reward(
         canvas: np.ndarray,
