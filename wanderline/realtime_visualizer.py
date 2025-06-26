@@ -110,6 +110,10 @@ class RealtimeVisualizer:
             os.makedirs(self.snapshot_dir, exist_ok=True)
             print(f"Snapshot directory: {self.snapshot_dir}")
     
+    def set_previous_total_steps(self, previous_steps: int):
+        """Set the number of steps from previous runs for display purposes."""
+        self.previous_total_steps = previous_steps
+    
     def update(self, canvas: np.ndarray, step: int, distance: float = None, 
                reward: float = None, angle: float = None, force_update: bool = False):
         """

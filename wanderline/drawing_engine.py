@@ -133,6 +133,7 @@ class DrawingEngine:
         # Setup visualizer
         if out_dir:
             self.visualizer.setup_snapshot_dir(out_dir)
+        self.visualizer.set_previous_total_steps(previous_total_steps)
         
         # Compute stroke length based on ratio
         h, w = canvas.shape[:2]
