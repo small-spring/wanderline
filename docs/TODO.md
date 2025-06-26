@@ -77,6 +77,29 @@ Use clear, concise descriptions with technical details when needed. Include:
 
 ## Ready for Implementation
 
+### User Interface Improvements
+**Context**: User feedback on current interface and functionality.
+
+- **Option Consolidation**: Reduce and organize CLI options for better usability
+  - Requirements: Review current options, identify redundancies, group related options
+  - Implementation: Refactor argument parser, update documentation
+  - Success criteria: Cleaner CLI interface with logical option grouping
+
+- **Resume Mode Step Display**: Show cumulative step count during resume operations
+  - Requirements: Display "Step X/Y (total: Z)" format where Z includes previous runs
+  - Implementation: Update step display logic in drawing engine and visualizer
+  - Success criteria: Clear indication of progress across resumed runs
+
+- **OpenCV Window Cleanup**: Remove obsolete 'p' option from OpenCV visualization
+  - Requirements: Remove 'p' key handler and update help text
+  - Implementation: Update realtime_visualizer.py keyboard handling
+  - Success criteria: Clean keyboard interface without deprecated options
+
+- **Pause Functionality**: Add ability to pause/resume drawing process
+  - Requirements: Pause key (spacebar), visual indication of pause state, resume capability
+  - Implementation: Add pause state management to drawing loop and visualizer
+  - Success criteria: Smooth pause/resume with clear user feedback
+
 ### Performance Optimization Enhancement
 **Context**: Completed - Major performance optimizations for greedy calculation implemented.
 
@@ -143,6 +166,14 @@ Use clear, concise descriptions with technical details when needed. Include:
 - **README**: Reorganizing project structure documentation
 
 ## Completed
+
+### Tensor Performance Analysis (2025-06-26)
+- **Hypothesis Testing**: Confirmed that tensor calculations are NOT effective in current implementation
+- **Performance Results**: Vectorized approach is 0.67x slower than sequential with 36x memory overhead
+- **Root Cause**: OpenCV line drawing bottleneck - cv2.line() requires loops, eliminating vectorization benefits  
+- **Memory Analysis**: 36 canvas copies (31.6 MB) vs sequential (0.9 MB) causes memory pressure
+- **Validation**: Current fast/ultra-fast optimizations (3.5x speedup) outperform "vectorized" approach
+- **Documentation**: Findings archived in git history and documented in CLAUDE.md
 
 ### Real-time Canvas Visualization (2025-06-26)
 - **OpenCV Real-time Window**: Full implementation with live canvas updates and keyboard controls

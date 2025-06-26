@@ -212,6 +212,10 @@ class RunManager:
             
             # Print info to console
             print(f"Total reward for this run after {executed_steps} steps: {total_reward:.2f}")
+            if self.previous_total_steps > 0:
+                print(f"Total steps completed: {total_steps_so_far} ({self.previous_total_steps} + {executed_steps})")
+            else:
+                print(f"Total steps completed: {executed_steps}")
             print(f"Distance stats (full) - min: {stats.min():.2f}, max: {stats.max():.2f}, mean: {stats.mean():.2f}, var: {stats.var():.2f}")
             
             # Save distances list

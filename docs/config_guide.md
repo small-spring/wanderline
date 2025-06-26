@@ -10,7 +10,7 @@ Wanderline can be configured using a JSON configuration file. By default, it loo
 
 1. Copy an existing configuration file:
    ```bash
-   cp configs/quick_test_l2.json configs/my_config.json
+   cp configs/default.json configs/my_config.json
    ```
 
 2. Edit `configs/my_config.json` to suit your needs.
@@ -19,16 +19,10 @@ Wanderline can be configured using a JSON configuration file. By default, it loo
 
 The `configs/` directory contains several pre-configured files:
 
-#### Standard Configurations
+#### Available Configuration Files
 - **`default.json`**: Default configuration used when no `--config` is specified
-- **`quick_test_l2.json`**: Quick test with standard L2 distance (100 steps)
-- **`quick_test_white_penalty.json`**: Quick test with white penalty (100 steps)  
-- **`long_run.json`**: Long-duration run configuration (5000 steps) with memory-efficient mode
-
-#### Performance-Optimized Configurations
-- **`fast_run.json`**: Speed-optimized configuration with fast agent (1000 steps)
-- **`ultra_fast_run.json`**: Maximum speed configuration with ultra-fast mode (500 steps)
-- **`long_run_memory_efficient.json`**: Optimized for 10,000+ step runs with both memory and speed optimizations
+- **`quick_test_2step.json`**: Multi-step lookahead test configuration (2-step greedy)
+- **`long_run.json`**: Long-duration run configuration (10,000 steps) with memory-efficient mode
 
 ### Configuration Options
 

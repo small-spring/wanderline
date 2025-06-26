@@ -6,7 +6,6 @@ Wanderline is an agent that draws images in a single-stroke style based on a giv
 
 ### For Users
 - **[Configuration Guide](config_guide.md)** - How to configure Wanderline with config files and CLI options
-- **[Technical Specification](specification.md)** - Detailed technical documentation and API reference
 
 ### For Developers
 - **[Coding Rules](coding_rules.md)** - Development guidelines and code standards
@@ -18,11 +17,8 @@ Wanderline is an agent that draws images in a single-stroke style based on a giv
 wanderline/
 ├── configs/          # Configuration files
 │   ├── default.json              # Default configuration
-│   ├── quick_test_*.json         # Quick test configurations
-│   ├── long_run.json             # Long-duration run configuration
-│   ├── fast_run.json             # Speed-optimized configuration
-│   ├── ultra_fast_run.json       # Maximum speed configuration
-│   └── long_run_memory_efficient.json  # 10,000+ step runs
+│   ├── quick_test_2step.json     # Multi-step lookahead test
+│   └── long_run.json             # Long-duration run configuration
 ├── debug/            # Debugging and analysis scripts (development only)
 │   └── README.md           # Guidelines for debug scripts
 ├── docs/             # Documentation
@@ -58,12 +54,12 @@ Wanderline can be configured in two ways:
    uv run python run_test.py
    
    # Use specific configuration
-   uv run python run_test.py --config configs/quick_test_l2.json
+   uv run python run_test.py --config configs/quick_test_2step.json
    ```
 
 2. **Command-line Arguments**: Override any setting directly
    ```zsh
-   uv run python run_test.py --steps 500 --greedy --white-penalty 0.15
+   uv run python run_test.py --steps 500 --greedy --opacity 0.3
    ```
 
 For detailed configuration options, see the [Configuration Guide](config_guide.md).
