@@ -1,16 +1,25 @@
 {
   "motif_path": "assets/sample.png",
   "ratio": 0.1,
-  "steps": 3000,
-  "duration": 5.0,
+  "steps": 10,
+  "duration": 15.0,
   "opacity": 0.1,
   "line_width": 2,
   "greedy": true,
   "patience": 10,
   "min_delta": 0.001,
   "reward_type": "l2_white_penalty",
-  "white_penalty": 0.1,
+  "white_penalty": 1,
   "lookahead_depth": 1,
+  "n_samples": 36,
   "verbose": false,
-  "resume_from": null
+  "resume_from": null,
+  "visualization": {
+    "enabled": true,
+    "mode": "opencv",
+    "update_frequency": 1,
+    "window_size": [800, 600],
+    "save_snapshots": true,
+    "snapshot_interval": 100
+  }
 }

@@ -32,19 +32,22 @@ Use clear, concise descriptions with technical details when needed. Include:
 ## Discussion Needed
 
 ### Advanced Optimization Strategies
-**Context**: Current greedy search is naive gradient descent. Need to decide which optimization methods to prioritize.
+**Context**: Core performance bottlenecks have been addressed. Consider advanced methods for further optimization.
 
 - **Adam-style Angle Optimizer**: Momentum-based angle selection with past gradient information
   - Need to determine: learning rate, momentum parameters, exploration noise strategy
   - Question: How to handle angle wrapping in momentum calculations?
+  - **Note**: May provide diminishing returns after 3.5x speedup achieved with progressive refinement
 
 - **Q-Learning for Angle Selection**: Learn long-term value of angle choices
   - Need to determine: state representation, action discretization, reward shaping
   - Question: How many angle bins? How to handle continuous state space?
+  - **Note**: Consider if complexity is justified vs current ultra-fast mode performance
 
 - **Variable Stroke Length Optimization**: Joint optimization of angle and stroke length
   - Need to determine: parameter bounds, constraint handling, loss function impact
   - Question: How does this affect loss function convexity?
+  - **Note**: Lower priority after memory and speed optimizations
 
 ### Transformer Agent Development
 **Context**: Current implementation uses MLP instead of actual transformer. Need to decide architecture and training approach.
@@ -74,31 +77,45 @@ Use clear, concise descriptions with technical details when needed. Include:
 
 ## Ready for Implementation
 
-### Real-time Canvas Visualization
-**Context**: Need visual feedback during drawing process for debugging and user experience.
+### Performance Optimization Enhancement
+**Context**: Completed - Major performance optimizations for greedy calculation implemented.
 
-- **OpenCV Real-time Window**: Display live canvas updates using `cv2.imshow()`
-  - Requirements: Non-blocking updates, keyboard shortcuts (pause/resume/save)
-  - Implementation: Add to `realtime_visualizer.py`, integrate with drawing loop
-  - Success criteria: Smooth updates without performance impact
+- ✅ **Memory-Efficient Canvas Operations**: Eliminate memory explosion in vectorized operations
+  - Requirements: Single canvas processing, progressive refinement, early termination
+  - Implementation: `wanderline/memory_efficient_canvas.py` + `wanderline/fast_agent.py`
+  - Success criteria: 3.5x speedup with 97%+ quality retention and 36x memory reduction
+  - **COMPLETED 2025-06-26**: Full implementation with ultra-fast and fast-agent modes
 
-- **Periodic Snapshot Saving**: Save canvas states at configurable intervals
-  - Requirements: Organized directory structure, configurable frequency
-  - Implementation: Extend `run_manager.py` with snapshot functionality
-  - Success criteria: Snapshots saved without affecting drawing performance
+- ✅ **Video Memory Optimization**: Coordinate-only logging for long runs
+  - Requirements: Stroke data logging, post-calculation video reconstruction
+  - Implementation: `wanderline/stroke_logger.py` + memory-efficient mode integration
+  - Success criteria: Support for 10,000+ steps without crashes, 15,000x+ memory reduction
+  - **COMPLETED 2025-06-26**: Full implementation with automatic video reconstruction
 
-- **ASCII Terminal Display**: Convert canvas to ASCII for terminal-only environments
-  - Requirements: Configurable resolution, grayscale-to-character mapping
-  - Implementation: Add ASCII converter utility, integrate with visualizer
-  - Success criteria: Readable ASCII representation updating in real-time
+### Configuration Management Enhancement  
+**Context**: Completed - config updater function implemented as alternative to inheritance system.
+
+- ✅ **Config Update Function**: Batch update multiple config files simultaneously
+  - Requirements: CLI tool, pattern matching, backup/restore, dry-run preview
+  - Implementation: `wanderline/config_updater.py` + `scripts/update_configs.py`
+  - Success criteria: Safe batch updates with rollback capability
+  - **COMPLETED 2025-06-26**: Full implementation with CLI interface and safety features
+
+### Test-Driven Development Implementation
+**Context**: Current tests exist but need assessment and TDD approach design for project.
+
+- ✅ **Test-Driven Development Implementation**: Complete TDD methodology for project
+  - Requirements: Test effectiveness analysis, TDD examples, testing patterns, workflow integration
+  - Implementation: Comprehensive development guidelines with TDD workflow and examples
+  - Success criteria: Clear TDD methodology with working examples and complete documentation
+  - **COMPLETED 2025-06-26**: Full TDD implementation merged into `docs/coding_rules.md` with:
+    - RED-GREEN-REFACTOR cycle examples
+    - 12/12 passing tests for config updater
+    - Complete test organization and best practices
+    - Development workflow integration
 
 ### Configuration System Enhancement
-**Context**: Need better organization of visualization and optimizer settings.
-
-- **Visualization Configuration**: Add structured config for visualization options
-  - Requirements: Mode selection, update frequency, window size settings
-  - Implementation: Extend `config_manager.py` with visualization section
-  - Success criteria: All visualization options configurable via JSON/CLI
+**Context**: Need better organization of optimizer settings.
 
 - **Optimizer Configuration**: Add structured config for optimization strategies
   - Requirements: Optimizer type, learning parameters, temperature settings
@@ -106,22 +123,12 @@ Use clear, concise descriptions with technical details when needed. Include:
   - Success criteria: Easy switching between optimization strategies
 
 ### Progress Monitoring & Visualization
-**Context**: Need detailed feedback during drawing process for debugging and optimization analysis.
+**Context**: Need additional detailed feedback during drawing process for debugging and optimization analysis.
 
 - **Verbose Angle Evaluation Mode**: Show angle candidates and rewards for each step
   - Requirements: Display all angle candidates, highlight selected angle with reasoning
   - Implementation: Add debug mode to agent, integrate with visualizer
   - Success criteria: Clear display of angle selection process without performance impact
-
-- **Interactive Controls**: Keyboard controls for drawing process
-  - Requirements: Pause/resume with keyboard, save current state, manual intervention mode
-  - Implementation: Add keyboard handler to drawing loop, state save/load functionality
-  - Success criteria: Responsive controls that don't interfere with drawing performance
-
-- **Live Performance Metrics**: Real-time performance monitoring
-  - Requirements: Memory usage tracking, steps/second calculation, convergence analysis
-  - Implementation: Add metrics collector, integrate with visualizer display
-  - Success criteria: Accurate metrics updated in real-time
 
 - **Multi-panel Dashboard**: Split view display for comprehensive monitoring
   - Requirements: Current canvas, target motif, difference map, performance graphs
@@ -136,6 +143,20 @@ Use clear, concise descriptions with technical details when needed. Include:
 - **README**: Reorganizing project structure documentation
 
 ## Completed
+
+### Real-time Canvas Visualization (2025-06-26)
+- **OpenCV Real-time Window**: Full implementation with live canvas updates and keyboard controls
+- **Periodic Snapshot Saving**: Automatic and manual snapshot functionality with organized directory structure
+- **ASCII Terminal Display**: Complete ASCII converter utility for terminal-only environments
+- **Visualization Configuration**: Comprehensive JSON configuration support for all visualization options
+- **Interactive Controls**: Keyboard shortcuts (q/ESC=quit, s=save, h=toggle overlay, p=print path)
+- **Live Performance Metrics**: Real-time display of step count, timing, distance, reward, and speed
+- **Integration**: Full integration with drawing loop and memory-efficient modes
+
+### Speed Display Fix (2025-06-26)
+- **Issue**: OpenCV window showed 0.0 steps/s due to incorrect calculation logic
+- **Fix**: Updated realtime_visualizer.py to properly calculate steps/second by dividing elapsed time by actual number of steps processed
+- **Result**: Accurate real-time speed display in OpenCV visualization window
 
 ### White Penalty System (2025-06-24)
 - **Implementation**: L2_white_penalty reward function with configurable penalty

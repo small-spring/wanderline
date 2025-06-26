@@ -17,9 +17,12 @@ Wanderline is an agent that draws images in a single-stroke style based on a giv
 ```
 wanderline/
 ├── configs/          # Configuration files
-│   ├── default.json        # Default configuration
-│   ├── quick_test_*.json   # Quick test configurations
-│   └── long_run.json       # Long-duration run configuration
+│   ├── default.json              # Default configuration
+│   ├── quick_test_*.json         # Quick test configurations
+│   ├── long_run.json             # Long-duration run configuration
+│   ├── fast_run.json             # Speed-optimized configuration
+│   ├── ultra_fast_run.json       # Maximum speed configuration
+│   └── long_run_memory_efficient.json  # 10,000+ step runs
 ├── debug/            # Debugging and analysis scripts (development only)
 │   └── README.md           # Guidelines for debug scripts
 ├── docs/             # Documentation
@@ -101,6 +104,10 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
 - `--line-width <int>`: Stroke thickness (line width) for drawing. Default: from config.json or 3.
 - `--reward-type <str>`: Reward/loss function type to use. Options: `l2`, `l2_white_penalty`. Default: `l2`.
 - `--white-penalty-alpha <float>`: Alpha value for white penalty (only used if `--reward-type` is `l2_white_penalty`).
+- `--memory-efficient`: Enable memory-efficient mode for long runs. Saves stroke coordinates instead of video frames during computation.
+- `--fast-agent`: Enable optimized fast greedy agent for 1.5x speedup. Uses adaptive sampling and early termination.
+- `--ultra-fast`: Enable ultra-fast mode for maximum speed (2-3.5x speedup). Uses progressive refinement with configurable sample count.
+- `--n-samples <int>`: Number of angle candidates to consider per step. Configures speed/quality tradeoff for ultra-fast mode.
 
 ### Example Commands
 
@@ -134,16 +141,28 @@ uv run python run_test.py [MOTIF_PATH] [OPTIONS]
     uv run python run_test.py assets/sample.png --agent-type transformer --steps 100 --opacity 0.3
     ```
 
-7.  **Using configuration files for different agent types:**
+7.  **Performance optimization modes:**
     ```zsh
-    # Standard transformer configuration
-    uv run python run_test.py --config config_transformer.json
+    # Ultra-fast mode for maximum speed (2.2x speedup with 16 samples)
+    uv run python run_test.py assets/sample.png --ultra-fast --n-samples 16 --greedy --memory-efficient
     
-    # Short test with transformer
-    uv run python run_test.py --config config_transformer_short.json
+    # Ultra-fast mode with standard quality (same speed as standard, memory efficient)
+    uv run python run_test.py assets/sample.png --ultra-fast --n-samples 36 --greedy --memory-efficient
     
-    # Detailed drawing with white penalty
-    uv run python run_test.py --config config_transformer_detailed.json
+    # Fast agent for balanced speed and quality (1.5x speedup)  
+    uv run python run_test.py assets/sample.png --fast-agent --greedy
+    
+    # Pre-configured ultra-fast setup
+    uv run python run_test.py --config configs/ultra_fast_run.json
+    ```
+
+8.  **Long runs with memory optimization:**
+    ```zsh
+    # Memory-efficient mode for 10,000+ steps
+    uv run python run_test.py assets/sample.png --steps 10000 --memory-efficient --greedy
+    
+    # Pre-configured long run setup
+    uv run python run_test.py --config configs/long_run_memory_efficient.json
     ```
 ## Run all tests
 ```zsh

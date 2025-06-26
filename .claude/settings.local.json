@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(rm:*)",
+      "Bash(grep:*)",
+      "Bash(uv run:*)",
+      "Bash(chmod:*)",
+      "Bash(uv run:*)",
+      "Bash(export:*)",
+      "Bash(rg:*)",
+      "Bash(rg:*)",
+      "Bash(PYTHONPATH=. uv run pytest tests/test_immutable_config.py -v)",
+      "Bash(find:*)",
+      "Bash(PYTHONPATH=. uv run python config_spec.py)",
+      "Bash(PYTHONPATH=. uv run pytest tests/test_practical_config.py -v)",
+      "Bash(find:*)"
+    ],
+    "deny": []
+  }
+}

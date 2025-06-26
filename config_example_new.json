@@ -1,0 +1,42 @@
+{
+  "motif_path": "assets/sample.png",
+  "resume_from": null,
+  
+  "agent": {
+    "type": "greedy",
+    "lookahead_depth": 1,
+    "n_samples": null,
+    "fast_mode": false,
+    "ultra_fast": true
+  },
+  
+  "visualization": {
+    "enabled": true,
+    "mode": "opencv",
+    "update_frequency": 10,
+    "window_size": [800, 600],
+    "save_snapshots": false,
+    "snapshot_interval": 100
+  },
+  
+  "reward": {
+    "type": "l2_white_penalty",
+    "white_penalty": 0.1
+  },
+  
+  "drawing": {
+    "steps": 500,
+    "duration": 15.0,
+    "opacity": 0.3,
+    "line_width": 3,
+    "ratio": 0.2
+  },
+  
+  "optimization": {
+    "memory_efficient": true,
+    "patience": 10,
+    "min_delta": 0.001,
+    "verbose": false,
+    "headless": false
+  }
+}

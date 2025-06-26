@@ -32,7 +32,7 @@ def main():
     
     # Execute main drawing loop
     final_canvas, distances, total_reward, final_position, converged, executed_steps = drawing_engine.run_drawing_loop(
-        canvas, motif, current_start, run_manager.initial_distances, recorder, frames_to_record, initial_canvas
+        canvas, motif, current_start, run_manager.initial_distances, recorder, frames_to_record, initial_canvas, out_dir, run_manager.previous_total_steps
     )
     
     # Finalize outputs

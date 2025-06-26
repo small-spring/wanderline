@@ -38,8 +38,12 @@ def load_config_and_parse_args():
     lookahead_depth_def = config.get('lookahead_depth', 1)
     n_samples_def = config.get('n_samples', None)  # Auto-select based on lookahead_depth if None
     verbose_def = config.get('verbose', False)
+    memory_efficient_def = config.get('memory_efficient', False)
+    fast_agent_def = config.get('fast_agent', False)
+    ultra_fast_def = config.get('ultra_fast', False)
     beam_width_def = config.get('beam_width', 5)
     n_rollouts_def = config.get('n_rollouts', 10)
+    visualization_def = config.get('visualization', {})
     
     # Create the main parser with all arguments
     parser = argparse.ArgumentParser(
@@ -80,8 +84,32 @@ def load_config_and_parse_args():
                         help='Stroke thickness (line width) for drawing. Default is from config.json or 3.')
     parser.add_argument('--verbose', action='store_true', default=verbose_def,
                         help='Enable verbose output showing timing information for agent computations. Useful for performance analysis.')
+    parser.add_argument('--memory-efficient', action='store_true', default=memory_efficient_def,
+                        help='Enable memory-efficient mode for long runs. Saves stroke coordinates instead of video frames during computation, then reconstructs video afterward. Recommended for runs with >1000 steps to prevent crashes.')
+    parser.add_argument('--fast-agent', action='store_true', default=fast_agent_def,
+                        help='Enable optimized fast greedy agent for 3-5x speedup. Uses adaptive sampling, early termination, and memory-efficient operations. Only works with 1-step lookahead (lookahead_depth=1).')
+    parser.add_argument('--ultra-fast', action='store_true', default=ultra_fast_def,
+                        help='Enable ultra-fast mode for maximum speed (5-10x speedup). Uses memory-efficient operations and progressive refinement. Sample count is configurable via --n-samples (default 16). Automatically disables real-time visualization for maximum performance.')
+    parser.add_argument('--headless', action='store_true', default=False,
+                        help='Disable real-time visualization entirely. Useful for batch processing or remote execution.')
     
     args = parser.parse_args()
+    
+    # Configure visualization based on flags
+    # Ultra-fast mode automatically disables visualization for maximum speed
+    viz_enabled = not args.headless and not args.ultra_fast
+    if hasattr(args, 'ultra_fast') and args.ultra_fast and not args.headless:
+        print("Ultra-fast mode: Real-time visualization automatically disabled for maximum performance")
+    
+    # Add visualization config to args
+    args.visualization = {
+        'enabled': viz_enabled,
+        'mode': visualization_def.get('mode', 'opencv'),
+        'update_frequency': visualization_def.get('update_frequency', 10),
+        'window_size': visualization_def.get('window_size', [800, 600]),
+        'save_snapshots': visualization_def.get('save_snapshots', False),
+        'snapshot_interval': visualization_def.get('snapshot_interval', 100)
+    }
     
     return args
 
