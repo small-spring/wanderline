@@ -27,14 +27,21 @@ UR5eロボットがRVizに表示されます。
 
 ---
 
-## 🧪 追加テスト
+## 🧪 追加デモ
 
-### 円描画デモ
+### 🎨 自動円描画デモ（推奨）
 ```bash
-python3 /workspace/robot/demos/demo_circle.py
+# v2: ROS2標準パターン版（推奨）
+./scripts/auto_circle_demo.sh
+
+# 手動バージョン（4ターミナル操作）  
+./scripts/demo_launcher.sh
+
+# または標準引数で手動制御
+ros2 launch /workspace/robot/launch/ur5e_standard.launch.py jsp_gui:=false use_rviz:=true
 ```
 
-### 数学テスト
+### 📊 基本テスト
 ```bash
 python3 /workspace/robot/tests/test_circle.py
 ```

@@ -10,8 +10,6 @@ This module extends Wanderline's single-stroke drawing optimization to control a
 
 ## 🚀 Quick Start
 
-**たった3ステップで動く！**
-
 ### 1. セットアップ実行
 ```bash
 cd robot
@@ -21,57 +19,77 @@ cd robot
 ### 2. VNC GUI開く  
 ブラウザで http://localhost:6081 にアクセス → 「Connect」をクリック
 
-### 3. ロボット表示
+### 3. 円描画デモ実行（推奨）
 VNCデスクトップでターミナルを開いて：
 ```bash
-source /opt/ros/humble/setup.bash
-ros2 launch ur_description view_ur.launch.py ur_type:=ur5e use_fake_hardware:=true launch_rviz:=true
+cd /workspace/robot
+./scripts/auto_circle_demo.sh
 ```
 
-**📖 詳細手順**: [QUICKSTART.md](QUICKSTART.md)
+## 🎯 Available Demos
 
-## 📁 Organized Structure
+### 🎨 Demo 1: Automatic Circle Drawing（推奨）
+
+**Perfect for**: Programmatic control, smooth motion, drawing applications
+
+**Quick Start**:
+```bash
+# Automated version (recommended)
+./scripts/auto_circle_demo.sh
+
+# Manual control version
+ros2 launch /workspace/robot/launch/ur5e_standard.launch.py jsp_gui:=false use_rviz:=true
+python3 /workspace/robot/demos/robot_draw_circle.py
+```
+
+**Features**:
+- ✅ Automatic smooth circle drawing
+- ✅ Coordinated multi-joint motion  
+- ✅ 50Hz smooth interpolation
+- ✅ No GUI control conflicts
+
+### 🎮 Demo 2: Interactive GUI Control
+
+**Perfect for**: Learning robot structure, manual exploration, joint testing
+
+**Quick Start**:
+```bash
+# Standard UR5e with GUI sliders
+source /opt/ros/humble/setup.bash
+ros2 launch ur_description view_ur.launch.py ur_type:=ur5e use_fake_hardware:=true launch_rviz:=true
+
+# Or use the demo launcher script
+./scripts/demo_launcher.sh
+```
+
+**Features**:
+- ✅ UR5e robot model in RViz
+- ✅ Interactive sliders for each joint
+- ✅ Manual control of robot pose
+- ✅ Real-time visual feedback
+
+## 📁 Project Structure
 
 ```
 robot/
-├── 📦 docker/              # Container definitions
-│   ├── Dockerfile.robot    # Main environment
-│   └── docker-compose.robot.yml
-├── 🔧 scripts/             # Setup utilities
-│   └── setup.sh           # Unified setup script
-├── 🎯 demos/               # Example applications
-│   ├── demo_circle.py     # Basic circle math
-│   ├── demo_circle_ros2.py # ROS2 integration
-│   └── move_robot_circle.py # Robot movement
-├── 🧪 tests/               # Validation tests
-│   ├── test_circle.py     # Circle math tests
-│   ├── simple_joint_test.py # Joint control
-│   └── auto_stop_joint_test.py # Advanced tests
-├── 📚 docs/                # Documentation
-│   ├── SETUP.md          # Detailed setup guide
-│   └── memo.md           # Development notes
-├── QUICKSTART.md         # 3-step quick start
-└── README.md             # This file
+├── 🎮 demos/                   # Demo applications
+│   ├── robot_draw_circle.py        # Circle drawing logic
+│   └── simple_joint_move.py        # Basic movement test
+├── 🚀 scripts/                 # Automation scripts
+│   ├── auto_circle_demo.sh      # Main automated demo
+│   ├── demo_launcher.sh            # Interactive demo chooser
+│   └── setup.sh                    # Environment setup
+├── 🔧 launch/                  # ROS2 launch files
+│   └── ur5e_standard.launch.py     # Standard ROS2 pattern
+├── 🐳 docker/                  # Container definitions
+│   ├── Dockerfile.robot            # Main environment
+│   └── docker-compose.robot.yml    # Service orchestration
+├── 🧪 tests/                   # Validation tests
+├── 📚 docs/                    # Documentation
+└── 📦 models/                  # 3D models and SDF files
 ```
 
-## 🎓 Learning Path
-
-### Phase 1: Foundation ✅
-- [x] Docker environment with ROS2 + Gazebo
-- [x] Basic circle waypoint calculation
-- [x] Test framework validation
-
-### Phase 2: Robot Integration ✅
-- [x] UR5e robot model loading
-- [ ] MoveIt2 trajectory planning
-- [ ] Gazebo simulation testing
-
-### Phase 3: Wanderline Integration 📋
-- [ ] Angle-to-waypoint conversion
-- [ ] Stroke sequence processing
-- [ ] End-to-end drawing demo
-
-## 🔧 Key Features
+## 🔧 Technical Features
 
 - **Dockerized Environment**: Complete ROS2 + Gazebo + Python stack
 - **Modular Design**: Clear separation of concerns
@@ -99,19 +117,28 @@ Wanderline Core                Robot Module
 - **[Development Notes](docs/memo.md)** - Technical implementation details
 - **[Project Root](../README.md)** - Main Wanderline documentation
 
-## 🎯 Example Output
+## 🛠️ Troubleshooting
 
+### Common Issues
+
+**Model Error on Startup**:
+- Normal behavior for 10 seconds while robot_description loads
+- Resolves automatically when circle drawing starts
+
+**Multiple RViz Windows**:
+- Use `auto_circle_demo.sh` which prevents this issue
+- Based on ROS2 standard patterns
+
+**VNC Connection Issues**:
+```bash
+docker-compose -f docker/docker-compose.robot.yml restart
 ```
-🎯 Circle Drawing Demo Starting...
-📍 Circle center: (0.3, 0.0, 0.2)
-📏 Circle radius: 0.1m
-🎯 Number of points: 12
 
-Point  0: x=0.400, y=0.000, z=0.200
-Point  1: x=0.387, y=0.050, z=0.200
-...
-✅ Generated 13 waypoints!
-🎉 Circle calculation complete!
+**Complete Reset**:
+```bash
+docker-compose -f docker/docker-compose.robot.yml down
+docker system prune -f
+./scripts/setup.sh
 ```
 
 Perfect for bridging algorithmic optimization with physical robotics! 🚀
