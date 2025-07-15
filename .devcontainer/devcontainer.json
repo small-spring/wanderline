@@ -1,0 +1,54 @@
+{
+    "name": "Wanderline Development Environment",
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "wanderline-dev",
+    "workspaceFolder": "/workspace",
+    
+    // VS Code拡張機能
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.flake8",
+                "ms-python.black-formatter",
+                "ms-toolsai.jupyter",
+                "ms-python.isort",
+                "ms-python.pylint",
+                "charliermarsh.ruff",
+                "ms-vscode.test-adapter-converter",
+                "ms-python.pytest",
+                "ms-vscode-remote.remote-containers"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/opt/venv/bin/python",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": true,
+                "python.formatting.provider": "black",
+                "python.testing.pytestEnabled": true,
+                "python.testing.unittestEnabled": false,
+                "python.testing.pytestArgs": [
+                    "tests"
+                ]
+            }
+        }
+    },
+    
+    // コンテナ作成後に実行するコマンド
+    "postCreateCommand": "source /opt/ros/humble/setup.bash && echo '🤖 Wanderline + ROS2 container ready! Try: cd robot && python3 demo_circle.py'",
+    
+    // ポートの転送
+    "forwardPorts": [8888, 8000],
+    "portsAttributes": {
+        "8888": {
+            "label": "Jupyter Notebook",
+            "onAutoForward": "notify"
+        },
+        "8000": {
+            "label": "Development Server",
+            "onAutoForward": "ignore"
+        }
+    },
+    
+    // コンテナのユーザー設定
+    "remoteUser": "root"
+}

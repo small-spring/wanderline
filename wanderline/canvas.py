@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import math
+from .constants import DEFAULT_STROKE_LENGTH_RATIO, STROKE_COLOR, OPACITY_THRESHOLD
 
 def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None, length: int = None, opacity: float = 1.0, return_end: bool = False, line_width: int = 3) -> np.ndarray:
     """
@@ -19,7 +20,7 @@ def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None,
         cy = min(max(sy, 0), h - 1)
     # determine stroke length
     if length is None:
-        length = int(min(w, h) * 0.4)
+        length = int(min(w, h) * DEFAULT_STROKE_LENGTH_RATIO)
     dx = int(math.cos(angle) * length)
     dy = int(math.sin(angle) * length)
     # compute and clamp end point
@@ -28,11 +29,11 @@ def apply_stroke(state: np.ndarray, angle: float, start: tuple[int, int] = None,
     end_pt = (ex, ey)
     img = state.copy()
     # draw with opacity: fully opaque or blended
-    if opacity >= 1.0:
-        cv2.line(img, (cx, cy), end_pt, (0, 0, 0), thickness=line_width)
+    if opacity >= OPACITY_THRESHOLD:
+        cv2.line(img, (cx, cy), end_pt, STROKE_COLOR, thickness=line_width)
     else:
         overlay = img.copy()
-        cv2.line(overlay, (cx, cy), end_pt, (0, 0, 0), thickness=line_width)
+        cv2.line(overlay, (cx, cy), end_pt, STROKE_COLOR, thickness=line_width)
         img = cv2.addWeighted(overlay, opacity, img, 1.0 - opacity, 0)
     if return_end:
         return img, end_pt
@@ -70,7 +71,7 @@ def apply_stroke_vectorized(state: np.ndarray, angles: np.ndarray, start: tuple[
     
     # Determine stroke length
     if length is None:
-        length = int(min(w, h) * 0.4)
+        length = int(min(w, h) * DEFAULT_STROKE_LENGTH_RATIO)
     
     # Vectorized computation of end points
     dx = np.cos(angles) * length
@@ -86,11 +87,11 @@ def apply_stroke_vectorized(state: np.ndarray, angles: np.ndarray, start: tuple[
     
     # Apply strokes to each canvas
     for i in range(n_samples):
-        if opacity >= 1.0:
-            cv2.line(canvases[i], (cx, cy), (int(ex[i]), int(ey[i])), (0, 0, 0), thickness=line_width)
+        if opacity >= OPACITY_THRESHOLD:
+            cv2.line(canvases[i], (cx, cy), (int(ex[i]), int(ey[i])), STROKE_COLOR, thickness=line_width)
         else:
             overlay = canvases[i].copy()
-            cv2.line(overlay, (cx, cy), (int(ex[i]), int(ey[i])), (0, 0, 0), thickness=line_width)
+            cv2.line(overlay, (cx, cy), (int(ex[i]), int(ey[i])), STROKE_COLOR, thickness=line_width)
             canvases[i] = cv2.addWeighted(overlay, opacity, canvases[i], 1.0 - opacity, 0)
     
     if return_end:

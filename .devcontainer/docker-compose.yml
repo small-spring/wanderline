@@ -1,0 +1,39 @@
+services:
+  wanderline-dev:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      # プロジェクトディレクトリをマウント
+      - ..:/workspace
+      # Pythonキャッシュを永続化
+      - python-cache:/root/.cache/uv
+      # Git設定を共有
+      - ~/.gitconfig:/root/.gitconfig:ro
+      # ROS2 workspace persistence
+      - robot-ws:/workspace/robot_ws
+    ports:
+      # Jupyter Notebook用
+      - "8888:8888"
+      # 開発サーバー用
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/workspace
+      - ROS_DISTRO=humble
+      - GAZEBO_MODEL_PATH=/workspace/robot_ws/src
+    stdin_open: true
+    tty: true
+    # privileged: true  # Comment out for better security on macOS
+    # network_mode: host  # Not supported on macOS/Windows
+    # GPUサポート（利用可能な場合）
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  python-cache:
+  robot-ws:

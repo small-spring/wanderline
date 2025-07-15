@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  wanderline-robot:
+    build:
+      context: ../..
+      dockerfile: robot/docker/Dockerfile.robot
+    volumes:
+      # Project directory
+      - ../..:/workspace
+      # Python cache
+      - robot-python-cache:/root/.cache/uv
+      # ROS2 workspace  
+      - robot-ws:/workspace/robot_ws
+      # Git configuration
+      - ~/.gitconfig:/root/.gitconfig:ro
+      # X11 socket for GUI applications (Linux/macOS)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    ports:
+      # VNC Web Interface (adjusted to match base image websockify port)
+      - "6081:80"
+      # VNC Server (alternative port)
+      - "5902:5901"
+      # Jupyter Notebook
+      - "8888:8888"
+      # Development server
+      - "8000:8000"
+      # ROS Master (if using ROS1 bridge)
+      - "11311:11311"
+    environment:
+      - PYTHONPATH=/workspace
+      - DISPLAY=${DISPLAY:-:0}
+      - ROS_DISTRO=humble
+      - GAZEBO_MODEL_PATH=/workspace/robot_ws/src
+    stdin_open: true
+    tty: true
+    privileged: true  # Required for GUI applications
+    # network_mode: host  # Disabled to enable port mapping for VNC
+    
+    # GPU support for Gazebo (uncomment if available)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  robot-python-cache:
+  robot-ws:
