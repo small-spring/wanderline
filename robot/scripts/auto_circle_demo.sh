@@ -1,10 +1,10 @@
 #!/bin/bash
-# 🎨 Automated Circle Drawing Demo v2
+# 🎨 Automated Circle Drawing Demo 
 # Uses standard ROS2 patterns for clean launch
 
 set -e
 
-echo "🎨 Automated Circle Drawing Demo v2"
+echo "🎨 Automated Circle Drawing Demo"
 echo "==================================="
 echo ""
 

@@ -23,12 +23,13 @@ case $choice in
     1)
         echo ""
         echo "🎮 Starting Interactive GUI Demo..."
-        python3 /workspace/robot/demos/demo1_interactive_gui.py
+        source /opt/ros/humble/setup.bash
+        ros2 launch ur_description view_ur.launch.py ur_type:=ur5e use_fake_hardware:=true launch_rviz:=true
         ;;
     2)
         echo ""
         echo "🎨 Starting Automatic Circle Drawing Demo..."
-        python3 /workspace/robot/demos/demo2_automatic_circle.py
+        bash /workspace/robot/scripts/auto_circle_demo.sh
         ;;
     *)
         echo ""
