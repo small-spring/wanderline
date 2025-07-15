@@ -15,13 +15,43 @@ cd robot
 
 ## 🤖 Step 3: ロボット表示
 **重要**: VNCデスクトップ内でターミナルを開いて実行：
+
+### デモ1: スライダーで動かせるロボット
 1. デスクトップを右クリック → "Open Terminal"
-2. デモ1: スライダーで動かせるロボット
+2. 以下を実行：
 ```bash
 source /opt/ros/humble/setup.bash
 ros2 launch ur_description view_ur.launch.py ur_type:=ur5e use_fake_hardware:=true launch_rviz:=true
 ```
-3. デモ2:  `./scripts/auto_circle_demo.sh` →円を書くロボット
+
+### デモ2: 円を描くロボット
+```bash
+./scripts/auto_circle_demo.sh
+```
+
+### デモ3: Phase 1 Dual Display System（✨新機能）
+**2つのウィンドウで3D+2Dビュー同時表示**
+
+**ターミナル1**: ロボット+RViz起動
+```bash
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=0
+export DISPLAY=:1.0
+ros2 launch /workspace/robot/launch/ur5e_standard.launch.py jsp_gui:=false use_rviz:=true
+```
+
+**ターミナル2**: Phase 1円描画+キャンバスプレビュー
+```bash
+cd /workspace/robot/demos/phase1
+source /opt/ros/humble/setup.bash
+export ROS_DOMAIN_ID=0
+export DISPLAY=:1.0
+python3 main.py
+```
+
+**結果**: 
+- Window 1 (RViz): 3Dロボットが円を描く動作
+- Window 2 (Canvas Preview): リアルタイム2D円描画進捗
 
 
 ## 🎉 完了！

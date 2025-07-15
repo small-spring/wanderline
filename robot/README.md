@@ -28,13 +28,31 @@ cd /workspace/robot
 
 ## 🎯 Available Demos
 
-### 🎨 Demo 1: Automatic Circle Drawing（推奨）
+### 🎨 Demo 1: Canvas Drawing Visualization（推奨）
 
-**Perfect for**: Programmatic control, smooth motion, drawing applications
+**Perfect for**: Complete drawing experience, real-time visualization, API access
 
 **Quick Start**:
 ```bash
-# Automated version (recommended)
+# Complete canvas drawing system
+./scripts/canvas_demo.sh
+```
+
+**Features**:
+- ✅ RViz canvas visualization with 3D surface
+- ✅ Real-time pen position tracking (red=down, blue=up)
+- ✅ Drawing trail visualization
+- ✅ Multiple drawing patterns (circle, square, spiral, figure-8)
+- ✅ Canvas state monitoring and API access
+- ✅ Coordinate conversion (pixel ↔ robot coordinates)
+
+### 🎨 Demo 2: Automatic Circle Drawing
+
+**Perfect for**: Basic robot movement, learning joint control
+
+**Quick Start**:
+```bash
+# Automated version
 ./scripts/auto_circle_demo.sh
 
 # Manual control version
@@ -48,7 +66,7 @@ python3 /workspace/robot/demos/robot_draw_circle.py
 - ✅ 50Hz smooth interpolation
 - ✅ No GUI control conflicts
 
-### 🎮 Demo 2: Interactive GUI Control
+### 🎮 Demo 3: Interactive GUI Control
 
 **Perfect for**: Learning robot structure, manual exploration, joint testing
 

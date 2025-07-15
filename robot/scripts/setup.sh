@@ -44,6 +44,14 @@ if [ -f /.dockerenv ]; then
         echo "⚠️  Gazebo packages not available - continuing without them"
     fi
     
+    print_step "Installing Python packages for Phase 1..."
+    # Install OpenCV for Canvas Preview Window
+    if pip install opencv-python > /dev/null 2>&1; then
+        echo "✅ OpenCV-Python installed successfully"
+    else
+        echo "⚠️  OpenCV-Python installation failed - Canvas Preview may not work"
+    fi
+    
     print_step "Setting up ROS2 environment..."
     source /opt/ros/humble/setup.bash
     

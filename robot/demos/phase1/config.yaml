@@ -1,0 +1,30 @@
+# Phase 1 Configuration - Minimal setup for testing
+
+phase1:
+  # Robot parameters (from existing system)
+  robot:
+    base_joints: [0.0, -1.2, -1.0, -1.5, 1.57, 0.0]
+    update_rate: 50  # 50Hz like existing system
+    
+  # Canvas parameters (from existing system)
+  canvas:
+    physical_size: 0.4        # 40cm
+    pixel_width: 800          
+    pixel_height: 600         
+    position: [0.5, 0.0, 0.1] # Robot base coordinates
+    contact_height: 0.005     # 5mm contact depth
+    
+  # Circle drawing (minimal)
+  drawing:
+    circle_center: [400, 300]  # Canvas center
+    circle_radius: 80          # 80 pixels
+    segments: 24               # 24 segments for smooth circle
+    
+  # Contact detection (basic)
+  contact_detection:
+    z_tolerance: 0.005         # 5mm tolerance
+    
+  # Performance (minimal)
+  performance:
+    robot_update_rate: 50
+    canvas_update_rate: 30

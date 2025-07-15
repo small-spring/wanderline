@@ -21,7 +21,8 @@
       "Bash(curl:*)",
       "Bash(cat:*)",
       "WebFetch(domain:answers.ros.org)",
-      "WebFetch(domain:automaticaddison.com)"
+      "WebFetch(domain:automaticaddison.com)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }
