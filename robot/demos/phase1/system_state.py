@@ -39,7 +39,7 @@ class CanvasConfig:
     pixel_width: int = 800                   # Pixel width
     pixel_height: int = 600                  # Pixel height
     position: Tuple[float, float, float] = (0.5, 0.0, 0.1)  # Robot base coordinates
-    contact_height: float = 0.005            # 5mm contact depth
+    contact_height: float = 0.02             # 2cm realistic pen length
 
 
 @dataclass

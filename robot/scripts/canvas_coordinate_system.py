@@ -27,13 +27,14 @@ Usage:
 import math
 from typing import Tuple, List, Dict
 
+# TODO: HARDCODE REMOVAL - All canvas configuration should come from config.yaml
 # Constants for better maintainability
-CANVAS_PHYSICAL_SIZE = 0.4  # 40cm in meters
-CANVAS_PIXEL_WIDTH = 800
-CANVAS_PIXEL_HEIGHT = 600
-CANVAS_POSITION = [0.5, 0.0, 0.1]  # Robot base coordinates
-PEN_CONTACT_HEIGHT = 0.005  # 5mm contact depth
-PEN_SAFE_HEIGHT = 0.05      # 5cm safety clearance
+CANVAS_PHYSICAL_SIZE = 0.4  # HARDCODE: Should be config['canvas']['physical_size']
+CANVAS_PIXEL_WIDTH = 800    # HARDCODE: Should be config['canvas']['pixel_width']
+CANVAS_PIXEL_HEIGHT = 600   # HARDCODE: Should be config['canvas']['pixel_height']
+CANVAS_POSITION = [0.6, 0.0, 0.05]  # HARDCODE: Should be config['canvas']['position']
+PEN_CONTACT_HEIGHT = 0.02   # HARDCODE: Should be config['canvas']['contact_height']
+PEN_SAFE_HEIGHT = 0.05      # HARDCODE: Should be config['canvas']['safe_height']
 
 
 class CanvasCoordinateSystem:
@@ -44,12 +45,19 @@ class CanvasCoordinateSystem:
     for drawing operations on a physical canvas.
     """
     
-    def __init__(self):
-        """Initialize canvas coordinate system with default parameters."""
-        # Canvas physical specifications (matches drawing_canvas.sdf)
-        self.canvas_width = CANVAS_PHYSICAL_SIZE
-        self.canvas_height = CANVAS_PHYSICAL_SIZE
-        self.canvas_position = CANVAS_POSITION.copy()
+    def __init__(self, config=None):
+        """Initialize canvas coordinate system with optional config parameters."""
+        # Use config values if provided, otherwise use defaults
+        if config and 'canvas' in config:
+            canvas_config = config['canvas']
+            self.canvas_width = canvas_config.get('physical_size', CANVAS_PHYSICAL_SIZE)
+            self.canvas_height = canvas_config.get('physical_size', CANVAS_PHYSICAL_SIZE)
+            self.canvas_position = canvas_config.get('position', CANVAS_POSITION).copy()
+        else:
+            # Canvas physical specifications (matches drawing_canvas.sdf)
+            self.canvas_width = CANVAS_PHYSICAL_SIZE
+            self.canvas_height = CANVAS_PHYSICAL_SIZE
+            self.canvas_position = CANVAS_POSITION.copy()
         
         # Digital resolution (matches Wanderline)
         self.pixel_width = CANVAS_PIXEL_WIDTH

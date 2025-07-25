@@ -69,15 +69,63 @@ class CircleCoordinateCalculator:
         if not canvas_state.contact_history or not canvas_state.target_shape:
             return 0.0
             
-        # Simple progress calculation based on number of contact points
-        # Assume roughly 100 contact points for a complete circle
-        expected_total_contacts = 100
-        current_contacts = len(canvas_state.contact_history)
+        # Calculate progress based on actual angle coverage of the circle
+        if len(canvas_state.contact_history) == 0:
+            return 0.0
+            
+        # Get all angles of contact points relative to circle center
+        center_x, center_y = canvas_state.target_shape.center
+        angles = []
         
-        # Calculate basic progress
-        basic_progress = min(current_contacts / expected_total_contacts, 1.0)
+        for contact in canvas_state.contact_history:
+            pixel_x, pixel_y = contact.position_2d
+            # Calculate angle from center
+            angle = math.atan2(pixel_y - center_y, pixel_x - center_x)
+            # Normalize to 0-2π range
+            if angle < 0:
+                angle += 2 * math.pi
+            angles.append(angle)
         
-        return basic_progress
+        if len(angles) == 0:
+            return 0.0
+            
+        # Calculate angular coverage
+        angles.sort()
+        
+        # Debug: Log angle distribution every 100 contacts
+        if len(angles) % 100 == 0:
+            print(f"🔍 ANGLE DEBUG: {len(angles)} contacts, angles: min={min(angles):.3f}, max={max(angles):.3f}")
+            print(f"   First 5 angles: {[f'{a:.3f}' for a in angles[:5]]}")
+        
+        # Simple approach: check if we have points in different quadrants
+        angle_ranges = [False, False, False, False]  # 4 quadrants
+        for angle in angles:
+            quadrant = int(angle / (math.pi / 2))
+            if quadrant < 4:
+                angle_ranges[quadrant] = True
+                
+        # Progress based on quadrant coverage
+        quadrants_covered = sum(angle_ranges)
+        angle_progress = quadrants_covered / 4.0
+        
+        # Also consider contact density (minimum contacts needed)
+        contact_progress = min(len(canvas_state.contact_history) / 24, 1.0)  # 24 points for smooth circle
+        
+        # Debug: Log quadrant coverage
+        if len(angles) % 100 == 0:
+            print(f"   Quadrants covered: {angle_ranges} = {quadrants_covered}/4 ({angle_progress:.3f})")
+            print(f"   Contact progress: {contact_progress:.3f}, Final: {min(angle_progress, contact_progress):.3f}")
+        
+        # Use the minimum of both (ensures both angle coverage AND sufficient density)
+        final_progress = min(angle_progress, contact_progress)
+        
+        # Debug: Log progress calculation details
+        if len(canvas_state.contact_history) % 10 == 0:  # Log every 10 contacts
+            print(f"🔍 PROGRESS DEBUG: Contacts={len(canvas_state.contact_history)} | "
+                  f"QuadrantsCovered={quadrants_covered}/4 ({angle_progress:.3f}) | "
+                  f"ContactProgress={contact_progress:.3f} | Final={final_progress:.3f}")
+        
+        return final_progress
     
     def _get_next_circle_point(self, current_progress: float, target_circle: TargetCircle, 
                               current_position: Tuple[float, float]) -> Tuple[float, float]:
@@ -101,12 +149,21 @@ class CircleCoordinateCalculator:
         center_x, center_y = target_circle.center
         current_angle = math.atan2(current_y - center_y, current_x - center_x)
         
-        # Advance to next angle increment
-        next_angle = current_angle + segment_angle / 4  # Smaller increments for smoother drawing
+        # Advance to next angle increment - proper step size for smooth circle
+        next_angle = current_angle + segment_angle / 2  # Normal increment for smooth circle
         
         # Calculate next point on circumference
         next_x = target_circle.center[0] + target_circle.radius * math.cos(next_angle)
         next_y = target_circle.center[1] + target_circle.radius * math.sin(next_angle)
+        
+        # Debug: Log circle movement (every 50 calls)
+        if not hasattr(self, '_movement_debug_counter'):
+            self._movement_debug_counter = 0
+        self._movement_debug_counter += 1
+        
+        if self._movement_debug_counter % 50 == 0:
+            print(f"🎯 CIRCLE MOVE: Current({current_x:.1f},{current_y:.1f}) → "
+                  f"Next({next_x:.1f},{next_y:.1f}) | Angle: {math.degrees(current_angle):.1f}° → {math.degrees(next_angle):.1f}°")
         
         # Ensure stroke length doesn't exceed maximum (5 pixels max step)
         distance = math.sqrt((next_x - current_x)**2 + (next_y - current_y)**2)

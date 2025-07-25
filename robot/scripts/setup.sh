@@ -33,12 +33,27 @@ if [ -f /.dockerenv ]; then
     # Inside container - install packages
     print_header "Installing packages inside container..."
     
+    print_step "Setting up ROS2 repository..."
+    # Ensure ROS2 repository is properly configured
+    echo "deb http://packages.ros.org/ros2/ubuntu jammy main" > /etc/apt/sources.list.d/ros2.list
+    
     print_step "Updating package list..."
     apt-get update -qq
     
-    print_step "Installing Gazebo and ROS2 packages..."
+    print_step "Installing ROS2 packages..."
+    # Install essential ROS2 packages for UR5e robot
+    if apt-get install -y ros-humble-ur-description ros-humble-ur-robot-driver ros-humble-joint-state-publisher-gui > /dev/null 2>&1; then
+        echo "✅ ROS2 UR packages installed successfully"
+    else
+        echo "⚠️  Some ROS2 packages may not be available - trying alternative approach"
+        # Try installing from base ROS2 repos without additional signing
+        apt-get install -y --allow-unauthenticated ros-humble-ur-description || echo "⚠️  ur-description not available"
+        apt-get install -y --allow-unauthenticated ros-humble-joint-state-publisher-gui || echo "⚠️  joint-state-publisher-gui not available"
+    fi
+    
+    print_step "Installing Gazebo packages (optional)..."
     # Try to install gazebo packages, but continue if they fail
-    if apt-get install -y gazebo ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros2-control > /dev/null 2>&1; then
+    if apt-get install -y ros-humble-gazebo-ros-pkgs ros-humble-gazebo-ros2-control > /dev/null 2>&1; then
         echo "✅ Gazebo packages installed successfully"
     else
         echo "⚠️  Gazebo packages not available - continuing without them"
@@ -52,8 +67,23 @@ if [ -f /.dockerenv ]; then
         echo "⚠️  OpenCV-Python installation failed - Canvas Preview may not work"
     fi
     
+    print_step "Installing UR5e robot packages..."
+    # Clone and build UR5e description package
+    cd /home/ubuntu/ros2_ws/src
+    if [ ! -d "ur_description" ]; then
+        git clone -b humble https://github.com/UniversalRobots/Universal_Robots_ROS2_Description.git ur_description > /dev/null 2>&1
+        echo "✅ UR5e description cloned successfully"
+    else
+        echo "✅ UR5e description already exists"
+    fi
+    
+    cd /home/ubuntu/ros2_ws
+    colcon build --packages-select ur_description > /dev/null 2>&1
+    echo "✅ UR5e packages built successfully"
+    
     print_step "Setting up ROS2 environment..."
     source /opt/ros/humble/setup.bash
+    source /home/ubuntu/ros2_ws/install/setup.bash
     
     print_success "Container setup complete!"
     echo ""

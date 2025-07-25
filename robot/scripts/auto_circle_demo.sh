@@ -47,9 +47,10 @@ if [ "$NODE_COUNT" -lt "2" ]; then
     sleep 3
 fi
 
-# Start circle drawing
+# Start circle drawing (Phase 1 version)
 echo "🎨 Starting circle drawing..."
-python3 /workspace/robot/demos/robot_draw_circle.py &
+cd /workspace/robot/demos/phase1
+python3 main.py &
 CIRCLE_PID=$!
 
 # Wait for circle drawing to start
@@ -70,7 +71,7 @@ cleanup() {
     echo "🛑 Stopping demo..."
     kill $CIRCLE_PID 2>/dev/null || true
     kill $LAUNCH_PID 2>/dev/null || true
-    pkill -f robot_draw_circle || true
+    pkill -f "python3 main.py" || true
     sleep 2
     echo "✅ Demo stopped cleanly"
     exit 0

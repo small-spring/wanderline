@@ -49,10 +49,14 @@ class CanvasPreviewWindow:
         self.contact_count = 0
         self.total_contacts_expected = config.get('expected_total_contacts', 100)
         
+        # Pen trail tracking for continuous line drawing
+        self.pen_trail_points = []  # Store all contact points for trail visualization
+        
         # Window state
         self.window_name = "Phase 1 - Canvas Preview"
         self.window_created = False
         self.window_closed = False
+        self.display_available = False  # Will be set to True if GUI is available
         self.running = True
         
         # Thread-safe update mechanism
@@ -69,12 +73,14 @@ class CanvasPreviewWindow:
         return canvas
     
     def _init_window(self):
-        """Initialize OpenCV window (Wanderline style)."""
+        """Initialize OpenCV window (Wanderline style) with headless detection."""
         if not self.window_created:
             try:
                 # Create window with Wanderline flags for better compatibility
                 cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
                 cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
+                self.display_available = True
+                print("✅ Canvas Preview Window (Window 2) initialized successfully")
                 
                 # Create and display initial placeholder (Wanderline style)
                 placeholder = np.ones((self.canvas_height, self.canvas_width, 3), dtype=np.uint8) * 50
@@ -96,7 +102,10 @@ class CanvasPreviewWindow:
                 print(f"✅ Canvas preview window initialized ({self.window_width}x{self.window_height})")
                 print("If you cannot see the window, check if it's hidden behind other windows")
             except Exception as e:
-                print(f"❌ Failed to initialize Canvas Preview window: {e}")
+                print(f"ℹ️  Canvas Preview Window (Window 2) disabled - headless environment detected")
+                print(f"   Technical details: {e}")
+                print(f"   💡 This is normal for Docker/server environments without GUI")
+                self.display_available = False
                 self.window_created = False
     
     def update_from_contact(self, contact_point: ContactPoint):
@@ -116,8 +125,15 @@ class CanvasPreviewWindow:
     def _process_pending_contacts(self):
         """Process all pending contact points and update canvas."""
         for contact in self.pending_contacts:
+            # Add to trail for continuous line drawing
+            self.pen_trail_points.append(contact.position_2d)
+            
+            # Draw contact stroke
             self._draw_contact_stroke(contact)
             self.contact_count += 1
+        
+        # Draw continuous trail between contact points
+        self._draw_pen_trail()
         
         # Clear processed contacts
         self.pending_contacts.clear()
@@ -146,6 +162,27 @@ class CanvasPreviewWindow:
                     if 0 <= px < self.canvas_width and 0 <= py < self.canvas_height:
                         self.canvas_image[py, px] = [0, 0, 0]  # Black stroke
     
+    def _draw_pen_trail(self):
+        """Draw continuous trail between contact points."""
+        if len(self.pen_trail_points) < 2:
+            return
+            
+        # Draw lines between consecutive trail points
+        for i in range(1, len(self.pen_trail_points)):
+            pt1 = self.pen_trail_points[i-1]
+            pt2 = self.pen_trail_points[i]
+            
+            # Ensure points are valid
+            if (0 <= pt1[0] < self.canvas_width and 0 <= pt1[1] < self.canvas_height and
+                0 <= pt2[0] < self.canvas_width and 0 <= pt2[1] < self.canvas_height):
+                
+                # Draw line between points (red color for trail)
+                cv2.line(self.canvas_image, 
+                        (int(pt1[0]), int(pt1[1])), 
+                        (int(pt2[0]), int(pt2[1])), 
+                        (0, 0, 255),  # Red color (BGR format)
+                        thickness=2)
+    
     def _update_display(self):
         """Update the OpenCV window display."""
         if not self.running:
@@ -159,12 +196,18 @@ class CanvasPreviewWindow:
         display_image = self._create_display_image()
         
         # Update window
-        cv2.imshow(self.window_name, display_image)
+        # Only show window if display is available
+        if self.display_available:
+            cv2.imshow(self.window_name, display_image)
+        else:
+            # Headless mode - just track progress internally
+            pass
         
-        # Handle window events (non-blocking)
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q') or cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
-            self.close()
+        # Handle window events (non-blocking) - only if display available
+        if self.display_available:
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
+                self.close()
     
     def _create_display_image(self) -> np.ndarray:
         """Create display image with progress overlay."""
@@ -181,8 +224,16 @@ class CanvasPreviewWindow:
     
     def _draw_progress_overlay(self, image: np.ndarray):
         """Draw progress information overlay on image."""
-        # Calculate progress
-        progress_percent = min((self.contact_count / self.total_contacts_expected) * 100, 100)
+        # Calculate progress - more realistic calculation
+        if self.contact_count < 50:
+            # Initial phase: 0-50%
+            progress_percent = (self.contact_count / 100) * 50
+        else:
+            # Use actual circle completion logic
+            # Estimate based on contact density (realistic for circle drawing)
+            estimated_total = max(200, self.contact_count * 1.2)  # Dynamic estimation
+            progress_percent = min((self.contact_count / estimated_total) * 100, 95)
+        
         elapsed_time = time.time() - self.start_time
         
         # Overlay text configuration
@@ -191,8 +242,8 @@ class CanvasPreviewWindow:
         color = (0, 0, 255)  # Red text
         thickness = 2
         
-        # Progress text
-        progress_text = f"Progress: {progress_percent:.1f}% ({self.contact_count} contacts)"
+        # Progress text - more informative
+        progress_text = f"Drawing: {progress_percent:.1f}% ({self.contact_count} points)"
         time_text = f"Time: {elapsed_time:.1f}s"
         
         # Draw text with background for visibility

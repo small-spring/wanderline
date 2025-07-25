@@ -54,7 +54,7 @@ def test_basic_functionality():
     
     # Test 3: Canvas Coordinate System
     print("3. Testing CanvasCoordinateSystem...")
-    canvas_system = CanvasCoordinateSystem()
+    canvas_system = CanvasCoordinateSystem()  # Using default config
     
     # Test pixel to robot conversion
     robot_coords = canvas_system.pixel_to_robot_coords(400, 300, pen_down=True)
@@ -100,7 +100,7 @@ def test_joint_calculation():
     """Test joint position calculation."""
     print("\n🤖 Testing Joint Position Calculation...")
     
-    canvas_system = CanvasCoordinateSystem()
+    canvas_system = CanvasCoordinateSystem()  # Using default config
     
     # Base joint configuration (from existing system)
     base_joints = [0.0, -1.2, -1.0, -1.5, 1.57, 0.0]

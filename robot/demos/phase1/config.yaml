@@ -3,7 +3,7 @@
 phase1:
   # Robot parameters (from existing system)
   robot:
-    base_joints: [0.0, -1.2, -1.0, -1.5, 1.57, 0.0]
+    base_joints: [-0.226, -0.820, 1.410, -1.570, 4.713, 0.000]  # Corrected wrist orientation: 1.570 + 3.14159 = 4.713
     update_rate: 50  # 50Hz like existing system
     
   # Canvas parameters (from existing system)
@@ -11,8 +11,16 @@ phase1:
     physical_size: 0.4        # 40cm
     pixel_width: 800          
     pixel_height: 600         
-    position: [0.5, 0.0, 0.1] # Robot base coordinates
-    contact_height: 0.005     # 5mm contact depth
+    position: [0.6, 0.0, 0.05] # Elevated canvas for realistic pen length
+    contact_height: 0.02      # 2cm realistic pen length
+    safe_height: 0.05         # 5cm safe movement height
+    
+  # Pen physical specifications (復旧: 1m pen that was working)
+  pen:
+    total_length: 1.0         # 1m total pen length (WORKING STATE)
+    body_offset: 0.5          # 50cm from tool flange to pen center
+    tip_offset: 1.0           # 1m from tool flange to pen tip
+    diameter: 0.012           # 1.2cm pen diameter
     
   # Circle drawing (minimal)
   drawing:
@@ -28,3 +36,13 @@ phase1:
   performance:
     robot_update_rate: 50
     canvas_update_rate: 30
+    
+  # Movement control
+  movement:
+    enable_interpolation: true    # Re-enable interpolation for smooth drawing
+    interpolation_steps: 10       # Reduced to 10 for faster movement (was 100)
+    
+  # CSV logging for debugging (configurable)
+  csv_logging:
+    enabled: true  # Set to false to disable CSV logging
+    flush_interval: 50  # Flush every N steps

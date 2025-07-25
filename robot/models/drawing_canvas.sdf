@@ -2,7 +2,7 @@
 <sdf version="1.7">
   <model name="drawing_canvas">
     <static>true</static>
-    <pose>0.5 0 0.1 0 0 0</pose>
+    <pose>0.6 0 0.05 0 0 0</pose>  <!-- Elevated canvas for realistic pen length -->
     
     <!-- Canvas surface (white drawing board) -->
     <link name="canvas_surface">

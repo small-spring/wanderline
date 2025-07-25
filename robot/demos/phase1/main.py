@@ -5,16 +5,21 @@ Phase 1 Main: Minimal Robot Circle Drawing Demo
 VNC environment test implementation.
 Integrates Phase 1 components with existing robot control system.
 """
-
-import rclpy
+# rclpy: ROS 2 Python client library
+import rclpy 
 from rclpy.node import Node
+
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
+from tf2_ros import TransformListener, Buffer
+from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
 import math
 import time
 import yaml
+import csv
 from pathlib import Path
+from datetime import datetime
 
 # Import Phase 1 components
 from system_state import create_default_system_state, SystemState, ContactPoint
@@ -38,6 +43,7 @@ else:
     sys.path.append('/Users/smallspring/programs/wanderline/robot/scripts')  # Local environment
 
 from canvas_coordinate_system import CanvasCoordinateSystem
+from corrected_coordinate_system import CorrectedCoordinateSystem
 
 
 class Phase1RobotDrawer(Node):
@@ -55,14 +61,24 @@ class Phase1RobotDrawer(Node):
         # Initialize Phase 1 components
         self.system_state = create_default_system_state()
         self.coord_calculator = create_coordinate_calculator(self.config['drawing'])
-        self.canvas_system = CanvasCoordinateSystem()
+        self.canvas_system = CanvasCoordinateSystem(self.config)
+        self.corrected_coords = CorrectedCoordinateSystem()  # Use corrected coordinate system
         
         # Initialize Canvas Preview Window (if available)
         self.canvas_preview = None
         if CANVAS_PREVIEW_AVAILABLE:
+            # Check if VNC display is available
+            import os
+            display = os.environ.get('DISPLAY', '')
+            self.get_logger().info(f"🔍 Display environment: DISPLAY={display}")
+            
             try:
                 self.canvas_preview = create_preview_window(self.config)
-                self.get_logger().info("🎨 Canvas Preview Window initialized")
+                # Check if display is actually available after initialization
+                if hasattr(self.canvas_preview, 'display_available') and self.canvas_preview.display_available:
+                    self.get_logger().info("🎨 Canvas Preview Window (Window 2) initialized successfully")
+                else:
+                    self.get_logger().info("💻 Canvas Preview Window disabled (headless environment)")
             except Exception as e:
                 self.get_logger().warning(f"⚠️  Canvas Preview failed to initialize: {e}")
                 self.canvas_preview = None
@@ -72,7 +88,25 @@ class Phase1RobotDrawer(Node):
         
         # Canvas visualization in RViz
         self.canvas_marker_pub = self.create_publisher(Marker, '/canvas_marker', 10)
-        self._publish_canvas_marker()
+        self.pen_trail_pub = self.create_publisher(MarkerArray, '/pen_trail', 10)
+        self.pen_tip_pub = self.create_publisher(Marker, '/pen_tip', 10)  # End-effector as pen tip
+        self.pen_body_pub = self.create_publisher(Marker, '/pen_body', 10)  # Pen body visualization
+        
+        # ✅ DEBUG: Add coordinate debugging publisher
+        from geometry_msgs.msg import PointStamped
+        self.debug_coords_pub = self.create_publisher(PointStamped, '/debug_coordinates', 10)
+        
+        self.pen_trail_points = []  # Store pen trail points
+        
+        # CSV logging for position analysis
+        self.csv_log_file = None
+        self.csv_writer = None
+        self._setup_csv_logging()
+        
+        # TF listener for accurate robot position
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        
         self.joint_names = [
             'shoulder_pan_joint',
             'shoulder_lift_joint', 
@@ -90,16 +124,65 @@ class Phase1RobotDrawer(Node):
         # Drawing state
         self.current_pixel_position = (400, 300)  # Start at canvas center
         self.drawing_active = True
-        self.interpolation_steps = 25
+        
+        # Movement control (configurable)
+        movement_config = self.config.get('movement', {})
+        self.enable_interpolation = movement_config.get('enable_interpolation', True)
+        self.interpolation_steps = movement_config.get('interpolation_steps', 25)
         self.current_step = 0
+        self.total_step_count = 0  # For CSV logging
+        
+        # Pen physical specifications (from config)
+        pen_config = self.config.get('pen', {})
+        self.pen_total_length = pen_config.get('total_length', 0.15)  # 15cm default
+        self.pen_body_offset = pen_config.get('body_offset', 0.05)   # 5cm default  
+        self.pen_tip_offset = pen_config.get('tip_offset', 0.10)     # 10cm default
+        self.pen_diameter = pen_config.get('diameter', 0.012)        # 1.2cm default
+        
+        # Debug: Log pen configuration
+        self.get_logger().info(f"🖊️  Pen Config: Length={self.pen_total_length:.3f}m, TipOffset={self.pen_tip_offset:.3f}m")
+        self.get_logger().info(f"🖊️  Canvas at Z={self.canvas_system.canvas_position[2]:.3f}m")
         
         # Timer for smooth movement
         update_rate = 1.0 / self.config['robot']['update_rate']
         self.timer = self.create_timer(update_rate, self.drawing_step)
         
+        # Now that base_joints is initialized, publish canvas marker
+        self._publish_canvas_marker()
+        
         self.get_logger().info("🎯 Phase 1 Robot Drawer started!")
         self.get_logger().info(f"📍 Starting at canvas center: {self.current_pixel_position}")
         
+    def _setup_csv_logging(self):
+        """Setup CSV logging for position analysis."""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_dir = Path(__file__).parent / "coordinate_analysis"
+        log_dir.mkdir(exist_ok=True)
+        
+        csv_file_path = log_dir / f"pen_trail_analysis_{timestamp}.csv"
+        
+        try:
+            self.csv_log_file = open(csv_file_path, 'w', newline='')
+            self.csv_writer = csv.writer(self.csv_log_file)
+            
+            # Write CSV header
+            self.csv_writer.writerow([
+                'timestamp',
+                'step_count',
+                'target_pixel_x', 'target_pixel_y',
+                'actual_pixel_x', 'actual_pixel_y',
+                'pen_body_x', 'pen_body_y', 'pen_body_z',
+                'trail_contact_x', 'trail_contact_y', 'trail_contact_z',
+                'joint_0', 'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5',
+                'progress_percent', 'contact_count'
+            ])
+            
+            self.get_logger().info(f"📊 CSV logging started: {csv_file_path}")
+        except Exception as e:
+            self.get_logger().warning(f"⚠️ CSV logging failed to initialize: {e}")
+            self.csv_log_file = None
+            self.csv_writer = None
+    
     def _load_config(self) -> dict:
         """Load configuration from YAML file."""
         config_path = Path(__file__).parent / 'config.yaml'
@@ -128,15 +211,45 @@ class Phase1RobotDrawer(Node):
         if not self.drawing_active:
             return
             
-        # Step 1: Calculate next coordinate using Phase 1 algorithm
+        # ✅ Step 1: Get actual robot position using current interpolated joints
+        actual_robot_pos = self._joints_to_robot_position(self.current_joints)
+        actual_pixel_pos = self.corrected_coords.robot_to_pixel_coords(actual_robot_pos[0], actual_robot_pos[1])
+        
+        # DEBUG: Log actual robot position with consistent naming
+        if hasattr(self, '_debug_counter'):
+            self._debug_counter += 1
+        else:
+            self._debug_counter = 0
+            
+        if self._debug_counter % 10 == 0:  # Log every 10 steps
+            self.get_logger().info(
+                f"🔍 ACTUAL: Joints {[f'{j:.3f}' for j in self.current_joints[:3]]} → "
+                f"Robot({actual_robot_pos[0]:.3f},{actual_robot_pos[1]:.3f},{actual_robot_pos[2]:.3f}) → "
+                f"Pixel({actual_pixel_pos[0]:.1f},{actual_pixel_pos[1]:.1f})"
+            )
+        
+        # Validate pixel coordinates before proceeding
+        if (actual_pixel_pos[0] < 0 or actual_pixel_pos[0] > 800 or 
+            actual_pixel_pos[1] < 0 or actual_pixel_pos[1] > 600):
+            self.get_logger().warning(
+                f"⚠️ Invalid pixel position: ({actual_pixel_pos[0]:.1f}, {actual_pixel_pos[1]:.1f}) - using fallback"
+            )
+            # Fallback: use current stored position
+            actual_pixel_pos = self.current_pixel_position
+        
+        # Step 2: Calculate next coordinate based on actual robot position
         next_coord, drawing_complete = self.coord_calculator.calculate_next_coordinate(
-            self.current_pixel_position, self.system_state
+            actual_pixel_pos, self.system_state
         )
         
         if drawing_complete:
-            self.get_logger().info("🎉 Circle drawing completed!")
-            self.drawing_active = False
-            return
+            self.get_logger().info("🎉 Circle drawing completed! Starting new circle...")
+            # Reset for continuous circles
+            self.system_state = create_default_system_state()
+            self.current_pixel_position = (400, 300)  # Reset to center
+            # ✅ Keep pen trail for continuous drawing visualization
+            # self.pen_trail_points.clear()  # Disabled - keep trail visible
+            # Don't stop drawing - continue with new circle
             
         if next_coord is None:
             self.get_logger().warning("⚠️ No next coordinate calculated")
@@ -163,79 +276,167 @@ class Phase1RobotDrawer(Node):
         )
     
     def _pixel_to_joint_position(self, pixel_x: float, pixel_y: float) -> list:
-        """Convert pixel coordinates to joint positions."""
-        # Convert pixel to robot coordinates
-        robot_x, robot_y, robot_z = self.canvas_system.pixel_to_robot_coords(
+        """Convert pixel coordinates to joint positions considering pen tip offset."""
+        # Step 1: Convert pixel to pen tip target position (Canvas面接触)
+        pen_tip_target_x, pen_tip_target_y, _ = self.corrected_coords.pixel_to_robot_coords(
             pixel_x, pixel_y, pen_down=True
         )
+        # Override Z coordinate to Canvas surface contact height
+        canvas_z = self.canvas_system.canvas_position[2]  # Canvas surface at 5cm
+        pen_tip_target_z = canvas_z + 0.001  # Just touch Canvas surface (1mm above)
         
-        # Map to joint space (from existing robot_draw_circle.py)
-        canvas_center_x, canvas_center_y = 0.5, 0.0
-        pan_amplitude = 0.6   # ±34 degrees base rotation
-        lift_amplitude = 0.3  # ±17 degrees shoulder motion
+        # Step 2: Calculate tool flange target position (reverse pen tip calculation)
+        # BUG FIX: tool flangeから下方向にペンが延びるので、逆算では上方向に移動
+        # Pen tip is pen_tip_offset BELOW tool flange, so tool flange should be ABOVE
+        tool_flange_target_x = pen_tip_target_x
+        tool_flange_target_y = pen_tip_target_y  
+        tool_flange_target_z = pen_tip_target_z + self.pen_tip_offset  # Move tool flange UP by pen length
         
-        # Calculate joint offsets
-        pan_offset = (robot_x - canvas_center_x) / 0.2 * pan_amplitude
-        lift_offset = (robot_y - canvas_center_y) / 0.2 * lift_amplitude
+        # Debug: Log position calculation every 25 calls
+        if not hasattr(self, '_position_calc_counter'):
+            self._position_calc_counter = 0
+        self._position_calc_counter += 1
         
-        # Apply to base configuration
-        joints = self.base_joints.copy()
-        joints[0] = self.base_joints[0] + pan_offset   # shoulder_pan_joint
-        joints[1] = self.base_joints[1] + lift_offset  # shoulder_lift_joint
+        if self._position_calc_counter % 25 == 0:
+            self.get_logger().info(
+                f"🎯 POS CALC: Pixel({pixel_x:.1f},{pixel_y:.1f}) → "
+                f"PenTip({pen_tip_target_x:.3f},{pen_tip_target_y:.3f},{pen_tip_target_z:.3f}) → "
+                f"ToolFlange({tool_flange_target_x:.3f},{tool_flange_target_y:.3f},{tool_flange_target_z:.3f})"
+            )
+        
+        # Step 3: Calculate joints for tool flange position
+        joints = self.corrected_coords.robot_coords_to_joints(
+            tool_flange_target_x, tool_flange_target_y, tool_flange_target_z, self.base_joints
+        )
+        joints[4] = 1.57 + 3.14159   # Wrist 2 perpendicular + 180° rotation (for canvas orientation)
+        joints[5] = 0.0   # Wrist 3 no rotation
         
         return joints
     
     def _execute_smooth_movement(self, target_joints: list):
-        """Execute smooth interpolated movement to target joints."""
-        if self.current_step >= self.interpolation_steps:
-            # Start new movement
-            self.current_joints = self.target_joints.copy()
-            self.target_joints = target_joints
-            self.current_step = 0
+        """Execute movement to target joints (with optional interpolation)."""
         
-        # Interpolate between current and target
-        progress = self.current_step / self.interpolation_steps
-        interpolated_joints = []
+        if self.enable_interpolation:
+            # === INTERPOLATED MOVEMENT (Original behavior) ===
+            if self.current_step >= self.interpolation_steps:
+                # Start new movement
+                self.current_joints = self.target_joints.copy()
+                self.target_joints = target_joints
+                self.current_step = 0
+            
+            # Interpolate between current and target
+            progress = self.current_step / self.interpolation_steps
+            interpolated_joints = []
+            
+            for i in range(len(self.current_joints)):
+                interpolated = self.current_joints[i] + (self.target_joints[i] - self.current_joints[i]) * progress
+                interpolated_joints.append(interpolated)
+            
+            # Debug: Log interpolation progress
+            if hasattr(self, '_interp_debug_counter'):
+                self._interp_debug_counter += 1
+            else:
+                self._interp_debug_counter = 0
+                
+            if self._interp_debug_counter % 100 == 0:  # Log every 100 steps
+                self.get_logger().info(
+                    f"🎯 INTERP: Step {self.current_step}/{self.interpolation_steps} ({progress:.2f}) | "
+                    f"Joints[{interpolated_joints[0]:.3f}, {interpolated_joints[1]:.3f}, {interpolated_joints[2]:.3f}]"
+                )
+            
+            active_joints = interpolated_joints
+            self.current_step += 1
+            
+        else:
+            # === DIRECT MOVEMENT (No interpolation) ===
+            active_joints = target_joints
+            self.current_joints = target_joints.copy()
+            
+            # Debug: Log direct movement
+            if hasattr(self, '_direct_debug_counter'):
+                self._direct_debug_counter += 1
+            else:
+                self._direct_debug_counter = 0
+                
+            if self._direct_debug_counter % 25 == 0:  # Log every 25 steps
+                self.get_logger().info(
+                    f"🎯 DIRECT: Target joints [{target_joints[0]:.3f}, {target_joints[1]:.3f}, {target_joints[2]:.3f}]"
+                )
         
-        for i in range(len(self.current_joints)):
-            interpolated = self.current_joints[i] + (self.target_joints[i] - self.current_joints[i]) * progress
-            interpolated_joints.append(interpolated)
-        
+        # Common processing for both modes
         # Publish joint state
-        self._publish_joint_state(interpolated_joints)
+        self._publish_joint_state(active_joints)
         
         # Update robot state in system state
-        joint_dict = dict(zip(self.joint_names, interpolated_joints))
-        robot_pos = self._joints_to_robot_position(interpolated_joints)
+        joint_dict = dict(zip(self.joint_names, active_joints))
+        robot_pos = self._joints_to_robot_position(active_joints)
         self.system_state.update_robot_position(joint_dict, robot_pos)
         
-        self.current_step += 1
+        # ✅ CONSISTENT DESIGN: Both trail and pen tip use actual robot position
+        actual_robot_pos = self._joints_to_robot_position(active_joints)
+        
+        # Debug: Log actual robot position (consistent)
+        if hasattr(self, '_coord_log_counter'):
+            self._coord_log_counter += 1
+        else:
+            self._coord_log_counter = 0
+            
+        if self._coord_log_counter % 50 == 0:  # Log actual robot position
+            mode_str = "INTERPOLATED" if self.enable_interpolation else "DIRECT"
+            self.get_logger().info(
+                f"🎯 {mode_str}: Robot Position({actual_robot_pos[0]:.3f},{actual_robot_pos[1]:.3f},{actual_robot_pos[2]:.3f})"
+            )
+        
+        # ✅ Both trail and pen tip use SAME pen tip position (真の一致)
+        pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(active_joints)
+        self._add_pen_trail_point(pen_tip_pos)  # Trail = ペン先位置
+        self._publish_pen_markers(pen_tip_pos)  # Pen tip = ペン先位置
+        
+        # ✅ DEBUG: Publish coordinate for external monitoring
+        self._publish_debug_coordinates(actual_robot_pos)
+        
+        # CSV logging temporarily disabled to avoid errors
+        
+        self.total_step_count += 1
     
     def _joints_to_robot_position(self, joints: list) -> tuple:
-        """Convert joint positions to estimated robot position."""
-        # Simplified forward kinematics approximation
-        # This is a rough estimate for testing purposes
-        pan_angle = joints[0]
-        lift_angle = joints[1]
+        """Convert joint positions to robot position using corrected forward kinematics."""
+        # Use corrected forward kinematics
+        return self.corrected_coords.joints_to_robot_position(joints)
         
-        # Rough calculation based on UR5e kinematics
-        arm_length = 0.4  # Approximate arm reach
-        x = 0.5 + arm_length * math.cos(pan_angle) * math.cos(lift_angle)
-        y = 0.0 + arm_length * math.sin(pan_angle) * math.cos(lift_angle)
-        z = 0.1 + arm_length * math.sin(lift_angle)
+        # Debug: Log actual robot hand position
+        if hasattr(self, '_position_log_counter'):
+            self._position_log_counter += 1
+        else:
+            self._position_log_counter = 0
+            
+        if self._position_log_counter % 50 == 0:  # Log every 50 updates
+            # Also convert back to pixel to check consistency
+            pixel_x, pixel_y = self.canvas_system.robot_to_pixel_coords(x, y)
+            self.get_logger().info(
+                f"🤚 Robot: X={x:.3f}, Y={y:.3f}, Z={z:.3f} | "
+                f"Pixel: ({pixel_x:.1f}, {pixel_y:.1f}) | "
+                f"Joints: pan={pan_angle:.3f}, lift={lift_angle:.3f}"
+            )
         
         return (x, y, z)
     
     def _simulate_contact_detection(self, pixel_coord: tuple):
         """Simulate contact detection and update system state."""
-        # Create contact point
-        robot_x, robot_y, robot_z = self.canvas_system.pixel_to_robot_coords(
-            pixel_coord[0], pixel_coord[1], pen_down=True
+        # ✅ CONSISTENT: Use pen tip position (same as trail and display)
+        pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(self.current_joints)
+        
+        # Calculate pen-canvas contact point using pen tip position
+        pen_contact_pos = self._calculate_trail_display_position(pen_tip_pos)
+        
+        # Convert contact position to pixel coordinates for canvas preview
+        contact_pixel = self.corrected_coords.robot_to_pixel_coords(
+            pen_contact_pos[0], pen_contact_pos[1]
         )
         
         contact_point = ContactPoint(
-            position_3d=(robot_x, robot_y, robot_z),
-            position_2d=(int(pixel_coord[0]), int(pixel_coord[1])),
+            position_3d=pen_contact_pos,  # Use pen-canvas contact point
+            position_2d=(int(contact_pixel[0]), int(contact_pixel[1])),  # Canvas contact pixels
             timestamp=time.time(),
             stroke_id=self.system_state.current_stroke_id
         )
@@ -243,7 +444,7 @@ class Phase1RobotDrawer(Node):
         # Add to system state
         self.system_state.add_contact_point(contact_point)
         
-        # Update Canvas Preview Window
+        # Update Canvas Preview Window with consistent contact point
         if self.canvas_preview:
             self.canvas_preview.update_from_contact(contact_point)
         
@@ -264,41 +465,260 @@ class Phase1RobotDrawer(Node):
         self.joint_pub.publish(msg)
     
     def _publish_canvas_marker(self):
-        """Publish canvas marker for RViz visualization."""
+        """Publish simple test canvas marker for RViz visualization."""
         marker = Marker()
         marker.header.frame_id = "base_link"
         marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "canvas"
+        marker.ns = "test_canvas"
         marker.id = 0
         marker.type = Marker.CUBE
         marker.action = Marker.ADD
         
-        # Canvas position and size (from canvas_coordinate_system.py)
-        marker.pose.position.x = 0.5  # Canvas center X
-        marker.pose.position.y = 0.0  # Canvas center Y  
-        marker.pose.position.z = 0.1  # Canvas surface Z
+        # UNIFIED: Use the SAME position as coordinate system
+        canvas_pos = self.canvas_system.canvas_position
+        marker.pose.position.x = canvas_pos[0]
+        marker.pose.position.y = canvas_pos[1] 
+        marker.pose.position.z = canvas_pos[2]
         marker.pose.orientation.x = 0.0
         marker.pose.orientation.y = 0.0
         marker.pose.orientation.z = 0.0
         marker.pose.orientation.w = 1.0
         
-        # Canvas size: 40cm x 40cm x 1mm
-        marker.scale.x = 0.4  # 40cm width
-        marker.scale.y = 0.4  # 40cm height  
-        marker.scale.z = 0.001  # 1mm thickness
+        # Realistic canvas size (40cm x 40cm)
+        marker.scale.x = 0.4  # 40cm width (matches CANVAS_PHYSICAL_SIZE)
+        marker.scale.y = 0.4  # 40cm height
+        marker.scale.z = 0.005  # 5mm thickness (realistic)
         
-        # White canvas color
+        # White canvas color (realistic drawing surface)
         marker.color.r = 1.0
         marker.color.g = 1.0
         marker.color.b = 1.0
-        marker.color.a = 0.8  # Semi-transparent
+        marker.color.a = 0.9  # Mostly opaque
         
         # Canvas persists until deleted
         marker.lifetime.sec = 0
         marker.lifetime.nanosec = 0
         
         self.canvas_marker_pub.publish(marker)
-        self.get_logger().info("📋 Canvas marker published to RViz")
+        self.get_logger().info(f"🎯 UNIFIED Canvas at [{canvas_pos[0]:.1f}, {canvas_pos[1]:.1f}, {canvas_pos[2]:.1f}] - ALL systems use this position")
+    
+    def _publish_pen_markers(self, pen_tip_pos: tuple):
+        """Publish pen tip marker at actual pen tip position."""
+        # Publish pen tip at actual calculated position
+        self._publish_pen_body(pen_tip_pos)
+        # Note: pen_tip removed - trail on canvas surface shows drawing contact
+    
+    def _publish_pen_body(self, pen_tip_pos: tuple):
+        """Publish pen attached to robot tool flange."""
+        pen_body = Marker()
+        pen_body.header.frame_id = "tool0"  # Attach to robot tool flange
+        pen_body.header.stamp = self.get_clock().now().to_msg()
+        pen_body.ns = "pen_body"
+        pen_body.id = 0
+        pen_body.type = Marker.CYLINDER  # Cylinder for visible pen axis
+        pen_body.action = Marker.ADD
+        
+        # Position relative to tool flange (pen extends downward toward canvas)
+        pen_body.pose.position.x = 0.0
+        pen_body.pose.position.y = 0.0 
+        pen_body.pose.position.z = -self.pen_body_offset  # Config-driven offset from tool flange
+        
+        # Orientation (pen points downward from tool flange)
+        pen_body.pose.orientation.x = 0.0
+        pen_body.pose.orientation.y = 0.0
+        pen_body.pose.orientation.z = 0.0
+        pen_body.pose.orientation.w = 1.0
+        
+        # Pen body dimensions (config-driven)
+        pen_body.scale.x = self.pen_diameter     # Config-driven diameter
+        pen_body.scale.y = self.pen_diameter     
+        pen_body.scale.z = self.pen_total_length # Config-driven length
+        
+        # Pen color (dark blue pen body)
+        pen_body.color.r = 0.0    
+        pen_body.color.g = 0.2
+        pen_body.color.b = 0.8    # Dark blue
+        pen_body.color.a = 1.0    
+        
+        pen_body.lifetime.sec = 0
+        pen_body.lifetime.nanosec = 0
+        
+        self.pen_body_pub.publish(pen_body)
+    
+    def _publish_pen_tip(self, robot_pos: tuple):
+        """Publish pen tip marker at end-effector position (simulation contact point)."""
+        pen_tip = Marker()
+        pen_tip.header.frame_id = "base_link"
+        pen_tip.header.stamp = self.get_clock().now().to_msg()
+        pen_tip.ns = "pen_tip"
+        pen_tip.id = 0
+        pen_tip.type = Marker.SPHERE
+        pen_tip.action = Marker.ADD
+        
+        # Position at end-effector (simulation contact point)
+        pen_tip.pose.position.x = robot_pos[0]
+        pen_tip.pose.position.y = robot_pos[1] 
+        pen_tip.pose.position.z = robot_pos[2]
+        pen_tip.pose.orientation.w = 1.0
+        
+        # Small sphere representing pen tip
+        pen_tip.scale.x = 0.012   # 1.2cm diameter pen tip
+        pen_tip.scale.y = 0.012   
+        pen_tip.scale.z = 0.012   
+        
+        # Bright red for visibility (contact point)
+        pen_tip.color.r = 1.0    
+        pen_tip.color.g = 0.0
+        pen_tip.color.b = 0.0
+        pen_tip.color.a = 1.0    
+        
+        pen_tip.lifetime.sec = 0
+        pen_tip.lifetime.nanosec = 0
+        
+        self.pen_tip_pub.publish(pen_tip)
+    
+    
+    def _calculate_pen_canvas_contact(self, robot_pos: tuple) -> tuple:
+        """Calculate where the pen tip contacts the canvas surface."""
+        canvas_z = self.canvas_system.canvas_position[2]  # Canvas surface height
+        
+        # Project pen position to canvas surface (vertical projection)
+        contact_x = robot_pos[0]
+        contact_y = robot_pos[1] 
+        contact_z = canvas_z + 0.002  # Slightly above canvas (2 mm) for visibility
+        
+        return (contact_x, contact_y, contact_z)
+    
+    def _calculate_trail_display_position(self, pen_tip_pos: tuple) -> tuple:
+        """Calculate trail display position for RViz visualization."""
+        canvas_z = self.canvas_system.canvas_position[2]  # Canvas surface height
+        
+        # Project pen tip to canvas surface for trail visualization
+        trail_x = pen_tip_pos[0]
+        trail_y = pen_tip_pos[1] 
+        trail_z = canvas_z + 0.003  # Slightly above canvas (3mm) for visibility
+        
+        return (trail_x, trail_y, trail_z)
+    
+    def _add_pen_trail_point(self, pen_tip_pos: tuple):
+        """Add pen tip point to trail and publish to RViz."""
+        # Use pen tip position directly (already calculated correctly)
+        contact_point = self._calculate_trail_display_position(pen_tip_pos)
+        
+        # Add contact point to trail
+        self.pen_trail_points.append(contact_point)
+        
+        # Limit trail length to show complete circle (increased for full circle)
+        if len(self.pen_trail_points) > 5000:  # Allow full circle trail
+            self.pen_trail_points.pop(0)
+        
+        # Publish trail every 10 points to reduce update frequency
+        if len(self.pen_trail_points) % 10 == 0:
+            self._publish_pen_trail()
+    
+    def _publish_pen_trail(self):
+        """Publish pen trail as line strip marker in RViz."""
+        if len(self.pen_trail_points) < 2:
+            return
+            
+        marker_array = MarkerArray()
+        
+        # Create line strip marker for pen trail
+        trail_marker = Marker()
+        trail_marker.header.frame_id = "base_link"
+        trail_marker.header.stamp = self.get_clock().now().to_msg()
+        trail_marker.ns = "pen_trail"
+        trail_marker.id = 0
+        trail_marker.type = Marker.LINE_STRIP
+        trail_marker.action = Marker.ADD
+        
+        # Set line properties
+        trail_marker.scale.x = 0.002  # 2mm line width
+        trail_marker.color.r = 1.0    # Red color
+        trail_marker.color.g = 0.0
+        trail_marker.color.b = 0.0
+        trail_marker.color.a = 0.8    # Semi-transparent
+        
+        # IMPORTANT: Set lifetime to persistent (prevent auto-deletion)
+        trail_marker.lifetime.sec = 0
+        trail_marker.lifetime.nanosec = 0
+        
+        # Add all points to the line strip - use actual robot positions
+        from geometry_msgs.msg import Point
+        for pos in self.pen_trail_points:
+            point = Point()
+            point.x = pos[0]
+            point.y = pos[1] 
+            point.z = pos[2]  # Use actual Z position for accurate representation
+            trail_marker.points.append(point)
+        
+        # Current pen position marker
+        current_marker = Marker()
+        current_marker.header.frame_id = "base_link"
+        current_marker.header.stamp = self.get_clock().now().to_msg()
+        current_marker.ns = "pen_current"
+        current_marker.id = 1
+        current_marker.type = Marker.SPHERE
+        current_marker.action = Marker.ADD
+        
+        # Set current pen position - use actual robot position
+        current_pos = self.pen_trail_points[-1]
+        current_marker.pose.position.x = current_pos[0]
+        current_marker.pose.position.y = current_pos[1]
+        current_marker.pose.position.z = current_pos[2]  # Use actual Z position
+        current_marker.pose.orientation.w = 1.0
+        
+        # Set sphere properties - smaller pen tip
+        current_marker.scale.x = 0.005  # 5mm diameter
+        current_marker.scale.y = 0.005
+        current_marker.scale.z = 0.005
+        current_marker.color.r = 0.0
+        current_marker.color.g = 1.0  # Green color
+        current_marker.color.b = 0.0
+        current_marker.color.a = 1.0
+        
+        # IMPORTANT: Set lifetime to persistent (prevent auto-deletion)
+        current_marker.lifetime.sec = 0
+        current_marker.lifetime.nanosec = 0
+        
+        marker_array.markers.append(trail_marker)
+        marker_array.markers.append(current_marker)
+        
+        self.pen_trail_pub.publish(marker_array)
+    
+    def _get_actual_robot_position(self) -> tuple:
+        """Get actual robot end-effector position from TF tree."""
+        try:
+            # Get transform from base_link to wrist_3_link (end effector)
+            transform = self.tf_buffer.lookup_transform(
+                'base_link',  # target frame
+                'wrist_3_link',  # source frame
+                rclpy.time.Time(),  # latest available
+                timeout=rclpy.duration.Duration(seconds=0.1)
+            )
+            
+            x = transform.transform.translation.x
+            y = transform.transform.translation.y
+            z = transform.transform.translation.z
+            
+            return (x, y, z)
+            
+        except (LookupException, ConnectivityException, ExtrapolationException) as e:
+            # TF lookup failed - return None to use fallback
+            return None
+
+    def _publish_debug_coordinates(self, robot_pos: tuple):
+        """Publish current robot coordinates for external monitoring."""
+        from geometry_msgs.msg import PointStamped
+        
+        debug_msg = PointStamped()
+        debug_msg.header.frame_id = "base_link"
+        debug_msg.header.stamp = self.get_clock().now().to_msg()
+        debug_msg.point.x = robot_pos[0]
+        debug_msg.point.y = robot_pos[1] 
+        debug_msg.point.z = robot_pos[2]
+        
+        self.debug_coords_pub.publish(debug_msg)
 
 
 def main(args=None):

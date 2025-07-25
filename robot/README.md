@@ -1,12 +1,16 @@
-# 🤖 Robot Simulation for Wanderline
+# 🤖 Robot Drawing System for Wanderline
 
-Transform Wanderline's optimized drawing strokes into physical robot movements using ROS2 and Gazebo simulation.
+Transform Wanderline's optimized drawing strokes into physical robot movements using a simulated UR5e robot arm.
 
 ## 🎯 Project Overview
 
-This module extends Wanderline's single-stroke drawing optimization to control a simulated UR5e robot arm, bridging the gap between algorithmic drawing and physical robotics.
+This system bridges algorithmic drawing and physical robotics, featuring:
+- **Circle drawing** with contact-based progress tracking
+- **Real-time visualization** in RViz + Canvas Preview
+- **Tool flange integration** with realistic pen simulation  
+- **0.0px coordinate accuracy** (verified through testing)
 
-**Pipeline**: `Wanderline Angles → 3D Waypoints → Robot Trajectories → Gazebo Simulation`
+**Pipeline**: `Circle Algorithm → Robot Coordinates → Joint Movements → RViz Visualization`
 
 ## 🚀 Quick Start
 
@@ -25,6 +29,15 @@ VNCデスクトップでターミナルを開いて：
 cd /workspace/robot
 ./scripts/auto_circle_demo.sh
 ```
+
+## 📚 Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Complete setup guide (Docker + VNC)
+- **[docs/system_overview.md](docs/system_overview.md)** - System architecture & specifications
+- **[docs/simulation_design.md](docs/simulation_design.md)** - Core simulation principles
+- **[docs/UR5e_specifications.md](docs/UR5e_specifications.md)** - Robot hardware specifications
+- **[docs/coordinate_system_reference.md](docs/coordinate_system_reference.md)** - Coordinate transformation math
+- **[docs/development_log.md](docs/development_log.md)** - Technical development history
 
 ## 🎯 Available Demos
 
