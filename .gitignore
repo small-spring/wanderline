@@ -12,3 +12,12 @@ wheels/
 # Output directories
 outputs/*
 snapshots/
+
+# ROS2 build artifacts
+install/
+log/
+*.log
+
+# ROS2 generated files
+**/.colcon/
+**/COLCON_IGNORE

@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as R
 # Import necessary message types
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point, Quaternion
-from msgs.PenState import PenState 
+from phase1_robot_drawing.msg import PenState 
 # /phase1/msgs/PenState.msg, 
 # contains: Point tip_position, Point base_position, bool is_contact 
 

@@ -9,9 +9,9 @@ Integrates Phase 1 components with existing robot control system.
 import rclpy 
 from rclpy.node import Node
 
+# Message libraries
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
-from visualization_msgs.msg import Marker, MarkerArray
 
 # tf2_ros: ROS 2 TF (TF: Transform Frame) library for coordinate transformations 
 from tf2_ros import TransformListener, Buffer
@@ -19,8 +19,6 @@ from tf2_ros import LookupException, ConnectivityException, ExtrapolationExcepti
 
 # Import necessary libraries
 import time
-import yaml
-from pathlib import Path
 
 # Import Phase 1 components
 from system_state import create_default_system_state, ContactPoint
@@ -31,7 +29,7 @@ from config_loader import ConfigLoader
 try:
     from canvas_preview import create_preview_window
     # path: 
-    CANVAS_PREVIEW_AVAILABLE = True
+    CANVAS_PREVIEW_AVAILABLE = False
 except ImportError:
     print("⚠️  Canvas Preview unavailable (OpenCV not found)")
     CANVAS_PREVIEW_AVAILABLE = False
@@ -51,6 +49,10 @@ from canvas_coordinate_system import CanvasCoordinateSystem
 from corrected_coordinate_system import CorrectedCoordinateSystem
 # wanderline/robot/scripts/corrected_coordinate_system.py
 
+# Import message types for RViz visualization (todo: move to separate file later)
+from phase1_robot_drawing.msg import PenState
+# robot/demos/phase1/msgs/PenState.msg
+from rviz_view_node import RvizViewNode
 
 class RobotDrawerNode(Node):
     """
@@ -94,18 +96,8 @@ class RobotDrawerNode(Node):
         # Robot control (from existing robot_draw_circle.py)
         self.joint_pub = self.create_publisher(JointState, '/joint_states', 10)
         
-        # Canvas visualization in RViz
-        self.canvas_marker_pub = self.create_publisher(Marker, '/canvas_marker', 10)
-        self.pen_trail_pub = self.create_publisher(MarkerArray, '/pen_trail', 10)
-        self.pen_tip_pub = self.create_publisher(Marker, '/pen_tip', 10)  # End-effector as pen tip
-        self.pen_body_pub = self.create_publisher(Marker, '/pen_body', 10)  # Pen body visualization
-        
-        # ✅ DEBUG: Add coordinate debugging publisher
-        from geometry_msgs.msg import PointStamped
-        
-        self.debug_coords_pub = self.create_publisher(PointStamped, '/debug_coordinates', 10)
-        
-        self.pen_trail_points = []  # Store pen trail points
+        # Pen state publisher for RViz visualization -> RvizViewNode
+        self.penstate_pub = self.create_publisher(PenState, '/pen_state', 10)
         
         # TF listener for accurate robot position
         self.tf_buffer = Buffer()
@@ -138,13 +130,13 @@ class RobotDrawerNode(Node):
         
         # Pen physical specifications (from config)
         pen_config = self.config.get('pen', {})
-        self.pen_total_length = pen_config.get('total_length')  
-        self.pen_body_offset = pen_config.get('body_offset') 
+        # self.pen_total_length = pen_config.get('total_length')  
+        # self.pen_body_offset = pen_config.get('body_offset') 
         self.pen_tip_offset = pen_config.get('tip_offset')
-        self.pen_diameter = pen_config.get('diameter')        # 1.2cm default
+        # self.pen_diameter = pen_config.get('diameter')        # 1.2cm default
         
         # Debug: Log pen configuration
-        self.get_logger().info(f"🖊️  Pen Config: Length={self.pen_total_length:.3f}m, TipOffset={self.pen_tip_offset:.3f}m")
+        # self.get_logger().info(f"🖊️  Pen Config: Length={self.pen_total_length:.3f}m, TipOffset={self.pen_tip_offset:.3f}m")
         self.get_logger().info(f"🖊️  Canvas at Z={self.canvas_system.canvas_position[2]:.3f}m")
         
         # Timer for smooth movement
@@ -152,7 +144,7 @@ class RobotDrawerNode(Node):
         self.timer = self.create_timer(update_rate, self.drawing_step)
         
         # Now that base_joints is initialized, publish canvas marker
-        self._publish_canvas_marker()
+        # self._publish_canvas_marker()
         
         self.get_logger().info("🎯 Phase 1 Robot Drawer started!")
         self.get_logger().info(f"📍 Starting at canvas center: {self.current_pixel_position}")
@@ -207,7 +199,7 @@ class RobotDrawerNode(Node):
         self.current_pixel_position = next_coord
         
         # Log progress
-        progress = self.system_state.completion_percentage
+        progress = self.system_state.completion_percentage # todo: progress is nonsense now. remove them.
         contact_count = self.system_state.get_contact_count()
         self.get_logger().info(
             f"📍 Moving to ({next_coord[0]:.1f}, {next_coord[1]:.1f}) | "
@@ -260,9 +252,6 @@ class RobotDrawerNode(Node):
         active_joints = interpolated_joints
         self.current_step += 1
             
-
-
-        
         # Common processing for both modes
         # Publish joint state
         self._publish_joint_state(active_joints)
@@ -272,16 +261,19 @@ class RobotDrawerNode(Node):
         robot_pos = self._joints_to_robot_position(active_joints)
         self.system_state.update_robot_position(joint_dict, robot_pos)
         
-        # ✅ CONSISTENT DESIGN: Both trail and pen tip use actual robot position
-        actual_robot_pos = self._joints_to_robot_position(active_joints)
-        
         # ✅ Both trail and pen tip use SAME pen tip position (真の一致)
         pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(active_joints)
-        self._add_pen_trail_point(pen_tip_pos)  # Trail = ペン先位置
-        self._publish_pen_markers(pen_tip_pos)  # Pen tip = ペン先位置
+        pen_base_pos = self._joints_to_robot_position(active_joints)
+        self._publish_pen_state(
+            pen_tip_pos=pen_tip_pos, 
+            pen_body_pos=pen_base_pos, 
+            is_contact=True # TODO: Determine actual contact state
+        )
+        # self._add_pen_trail_point(pen_tip_pos)  # Trail = ペン先位置
+        # self._publish_pen_markers(pen_tip_pos)  # Pen tip = ペン先位置
         
         # ✅ DEBUG: Publish coordinate for external monitoring
-        self._publish_debug_coordinates(actual_robot_pos)
+        # self._publish_debug_coordinates(actual_robot_pos)
     
     def _joints_to_robot_position(self, joints: list) -> tuple:
         """Convert joint positions to robot position using corrected forward kinematics."""
@@ -327,135 +319,22 @@ class RobotDrawerNode(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = self.joint_names
         msg.position = joint_positions
-        msg.velocity = [0.0] * len(self.joint_names)
-        msg.effort = [0.0] * len(self.joint_names)
-        
+        msg.velocity = [0.0] * len(self.joint_names) # todo: dummy velocities
+        msg.effort = [0.0] * len(self.joint_names) # todo: dummy efforts
+
         self.joint_pub.publish(msg)
-    
-    def _publish_canvas_marker(self):
-        """Publish simple test canvas marker for RViz visualization."""
-        marker = Marker()
-        marker.header.frame_id = "base_link"
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "test_canvas"
-        marker.id = 0
-        marker.type = Marker.CUBE
-        marker.action = Marker.ADD
-        
-        # UNIFIED: Use the SAME position as coordinate system
-        canvas_pos = self.canvas_system.canvas_position
-        marker.pose.position.x = canvas_pos[0]
-        marker.pose.position.y = canvas_pos[1] 
-        marker.pose.position.z = canvas_pos[2]
-        marker.pose.orientation.x = 0.0
-        marker.pose.orientation.y = 0.0
-        marker.pose.orientation.z = 0.0
-        marker.pose.orientation.w = 1.0
-        
-        # Realistic canvas size (40cm x 40cm)
-        marker.scale.x = 0.4  # 40cm width (matches CANVAS_PHYSICAL_SIZE)
-        marker.scale.y = 0.4  # 40cm height
-        marker.scale.z = 0.005  # 5mm thickness (realistic)
-        
-        # White canvas color (realistic drawing surface)
-        marker.color.r = 1.0
-        marker.color.g = 1.0
-        marker.color.b = 1.0
-        marker.color.a = 0.9  # Mostly opaque
-        
-        # Canvas persists until deleted
-        marker.lifetime.sec = 0
-        marker.lifetime.nanosec = 0
-        
-        self.canvas_marker_pub.publish(marker)
-        self.get_logger().info(f"🎯 UNIFIED Canvas at [{canvas_pos[0]:.1f}, {canvas_pos[1]:.1f}, {canvas_pos[2]:.1f}] - ALL systems use this position")
-    
-    def _publish_pen_markers(self, pen_tip_pos: tuple):
-        """Publish pen tip marker at actual pen tip position."""
-        # Publish pen tip at actual calculated position
-        self._publish_pen_body(pen_tip_pos)
-        # Note: pen_tip removed - trail on canvas surface shows drawing contact
-    
-    def _publish_pen_body(self, pen_tip_pos: tuple):
-        """Publish pen attached to robot tool flange."""
-        pen_body = Marker()
-        pen_body.header.frame_id = "tool0"  # Attach to robot tool flange
-        pen_body.header.stamp = self.get_clock().now().to_msg()
-        pen_body.ns = "pen_body"
-        pen_body.id = 0
-        pen_body.type = Marker.CYLINDER  # Cylinder for visible pen axis
-        pen_body.action = Marker.ADD
-        
-        # Position relative to tool flange (pen extends downward toward canvas)
-        pen_body.pose.position.x = 0.0
-        pen_body.pose.position.y = 0.0 
-        pen_body.pose.position.z = -self.pen_body_offset  # Config-driven offset from tool flange
-        
-        # Orientation (pen points downward from tool flange)
-        pen_body.pose.orientation.x = 0.0
-        pen_body.pose.orientation.y = 0.0
-        pen_body.pose.orientation.z = 0.0
-        pen_body.pose.orientation.w = 1.0
-        
-        # Pen body dimensions (config-driven)
-        pen_body.scale.x = self.pen_diameter     # Config-driven diameter
-        pen_body.scale.y = self.pen_diameter     
-        pen_body.scale.z = self.pen_total_length # Config-driven length
-        
-        # Pen color (dark blue pen body)
-        pen_body.color.r = 0.0    
-        pen_body.color.g = 0.2
-        pen_body.color.b = 0.8    # Dark blue
-        pen_body.color.a = 1.0    
-        
-        pen_body.lifetime.sec = 0
-        pen_body.lifetime.nanosec = 0
-        
-        self.pen_body_pub.publish(pen_body)
-    
-    def _publish_pen_tip(self, robot_pos: tuple):
-        """Publish pen tip marker at end-effector position (simulation contact point)."""
-        pen_tip = Marker()
-        pen_tip.header.frame_id = "base_link"
-        pen_tip.header.stamp = self.get_clock().now().to_msg()
-        pen_tip.ns = "pen_tip"
-        pen_tip.id = 0
-        pen_tip.type = Marker.SPHERE
-        pen_tip.action = Marker.ADD
-        
-        # Position at end-effector (simulation contact point)
-        pen_tip.pose.position.x = robot_pos[0]
-        pen_tip.pose.position.y = robot_pos[1] 
-        pen_tip.pose.position.z = robot_pos[2]
-        pen_tip.pose.orientation.w = 1.0
-        
-        # Small sphere representing pen tip
-        pen_tip.scale.x = 0.012   # 1.2cm diameter pen tip
-        pen_tip.scale.y = 0.012   
-        pen_tip.scale.z = 0.012   
-        
-        # Bright red for visibility (contact point)
-        pen_tip.color.r = 1.0    
-        pen_tip.color.g = 0.0
-        pen_tip.color.b = 0.0
-        pen_tip.color.a = 1.0    
-        
-        pen_tip.lifetime.sec = 0
-        pen_tip.lifetime.nanosec = 0
-        
-        self.pen_tip_pub.publish(pen_tip)
-    
-    
-    def _calculate_pen_canvas_contact(self, robot_pos: tuple) -> tuple:
-        """Calculate where the pen tip contacts the canvas surface."""
-        canvas_z = self.canvas_system.canvas_position[2]  # Canvas surface height
-        
-        # Project pen position to canvas surface (vertical projection)
-        contact_x = robot_pos[0]
-        contact_y = robot_pos[1] 
-        contact_z = canvas_z + 0.002  # Slightly above canvas (2 mm) for visibility
-        
-        return (contact_x, contact_y, contact_z)
+
+    def _publish_pen_state(self, pen_tip_pos: tuple, pen_body_pos: tuple, is_contact: bool):
+        msg = PenState()
+        msg.tip_position.x = pen_tip_pos[0]
+        msg.tip_position.y = pen_tip_pos[1]
+        msg.tip_position.z = pen_tip_pos[2]
+        msg.base_position.x = pen_body_pos[0]
+        msg.base_position.y = pen_body_pos[1]
+        msg.base_position.z = pen_body_pos[2]
+        msg.is_contact = is_contact
+        self.penstate_pub.publish(msg)
+  
     
     def _calculate_trail_display_position(self, pen_tip_pos: tuple) -> tuple:
         """Calculate trail display position for RViz visualization."""
@@ -468,129 +347,10 @@ class RobotDrawerNode(Node):
         
         return (trail_x, trail_y, trail_z)
     
-    def _add_pen_trail_point(self, pen_tip_pos: tuple):
-        """Add pen tip point to trail and publish to RViz."""
-        # Use pen tip position directly (already calculated correctly)
-        contact_point = self._calculate_trail_display_position(pen_tip_pos)
-        
-        # Add contact point to trail
-        self.pen_trail_points.append(contact_point)
-        
-        # Limit trail length to show complete circle (increased for full circle)
-        if len(self.pen_trail_points) > 5000:  # Allow full circle trail
-            self.pen_trail_points.pop(0)
-        
-        # Publish trail every 10 points to reduce update frequency
-        if len(self.pen_trail_points) % 10 == 0:
-            self._publish_pen_trail()
-    
-    def _publish_pen_trail(self):
-        """Publish pen trail as line strip marker in RViz."""
-        if len(self.pen_trail_points) < 2:
-            return
-            
-        marker_array = MarkerArray()
-        
-        # Create line strip marker for pen trail
-        trail_marker = Marker()
-        trail_marker.header.frame_id = "base_link"
-        trail_marker.header.stamp = self.get_clock().now().to_msg()
-        trail_marker.ns = "pen_trail"
-        trail_marker.id = 0
-        trail_marker.type = Marker.LINE_STRIP
-        trail_marker.action = Marker.ADD
-        
-        # Set line properties
-        trail_marker.scale.x = 0.002  # 2mm line width
-        trail_marker.color.r = 1.0    # Red color
-        trail_marker.color.g = 0.0
-        trail_marker.color.b = 0.0
-        trail_marker.color.a = 0.8    # Semi-transparent
-        
-        # IMPORTANT: Set lifetime to persistent (prevent auto-deletion)
-        trail_marker.lifetime.sec = 0
-        trail_marker.lifetime.nanosec = 0
-        
-        # Add all points to the line strip - use actual robot positions
-        from geometry_msgs.msg import Point
-        for pos in self.pen_trail_points:
-            point = Point()
-            point.x = pos[0]
-            point.y = pos[1] 
-            point.z = pos[2]  # Use actual Z position for accurate representation
-            trail_marker.points.append(point)
-        
-        # Current pen position marker
-        current_marker = Marker()
-        current_marker.header.frame_id = "base_link"
-        current_marker.header.stamp = self.get_clock().now().to_msg()
-        current_marker.ns = "pen_current"
-        current_marker.id = 1
-        current_marker.type = Marker.SPHERE
-        current_marker.action = Marker.ADD
-        
-        # Set current pen position - use actual robot position
-        current_pos = self.pen_trail_points[-1]
-        current_marker.pose.position.x = current_pos[0]
-        current_marker.pose.position.y = current_pos[1]
-        current_marker.pose.position.z = current_pos[2]  # Use actual Z position
-        current_marker.pose.orientation.w = 1.0
-        
-        # Set sphere properties - smaller pen tip
-        current_marker.scale.x = 0.005  # 5mm diameter
-        current_marker.scale.y = 0.005
-        current_marker.scale.z = 0.005
-        current_marker.color.r = 0.0
-        current_marker.color.g = 1.0  # Green color
-        current_marker.color.b = 0.0
-        current_marker.color.a = 1.0
-        
-        # IMPORTANT: Set lifetime to persistent (prevent auto-deletion)
-        current_marker.lifetime.sec = 0
-        current_marker.lifetime.nanosec = 0
-        
-        marker_array.markers.append(trail_marker)
-        marker_array.markers.append(current_marker)
-        
-        self.pen_trail_pub.publish(marker_array)
-    
-    def _get_actual_robot_position(self) -> tuple:
-        """Get actual robot end-effector position from TF tree."""
-        try:
-            # Get transform from base_link to wrist_3_link (end effector)
-            transform = self.tf_buffer.lookup_transform(
-                'base_link',  # target frame
-                'wrist_3_link',  # source frame
-                rclpy.time.Time(),  # latest available
-                timeout=rclpy.duration.Duration(seconds=0.1)
-            )
-            
-            x = transform.transform.translation.x
-            y = transform.transform.translation.y
-            z = transform.transform.translation.z
-            
-            return (x, y, z)
-            
-        except (LookupException, ConnectivityException, ExtrapolationException) as e:
-            # TF lookup failed - return None to use fallback
-            return None
-
-    def _publish_debug_coordinates(self, robot_pos: tuple):
-        """Publish current robot coordinates for external monitoring."""
-        from geometry_msgs.msg import PointStamped
-        
-        debug_msg = PointStamped()
-        debug_msg.header.frame_id = "base_link"
-        debug_msg.header.stamp = self.get_clock().now().to_msg()
-        debug_msg.point.x = robot_pos[0]
-        debug_msg.point.y = robot_pos[1] 
-        debug_msg.point.z = robot_pos[2]
-        
-        self.debug_coords_pub.publish(debug_msg)
 
 
 def main(args=None):
-    """Main function for Phase 1 robot drawing demo."""
+    """Main function for Phase 1 robot drawing demo with dual nodes."""
     print("🚀 Starting Phase 1 Robot Drawing Demo!")
     print("📍 Drawing circle using Phase 1 coordinate calculation")
     print("👀 Watch in RViz - robot will draw a circle")
@@ -599,12 +359,22 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
+        from rclpy.executors import MultiThreadedExecutor
+        
+        # Create both nodes
         drawer = RobotDrawerNode()
+        rviz_viewer = RvizViewNode()
         
-        print("✅ Phase 1 demo started successfully!")
-        print("🎯 Drawing circle with Phase 1 algorithm...")
+        # Use MultiThreadedExecutor for parallel execution
+        executor = MultiThreadedExecutor()
+        executor.add_node(drawer)
+        executor.add_node(rviz_viewer)
         
-        rclpy.spin(drawer)
+        print("✅ Both nodes started successfully!")
+        print("🎯 RobotDrawerNode: Drawing circle with Phase 1 algorithm...")
+        print("🎨 RvizViewNode: Visualizing pen state in RViz...")
+        
+        executor.spin()
         
     except KeyboardInterrupt:
         print("\n🎨 Phase 1 demo stopped by user")
