@@ -201,6 +201,13 @@ Each run creates a timestamped directory in `outputs/` containing:
 - English-only comments and documentation
 - Clear, descriptive variable names
 
+### YAGNI Principle (You Aren't Gonna Need It)
+- **Definition**: Don't implement features you don't currently need
+- **Application**: Phase1 focuses on drawing functionality; prioritize simplicity over future extensibility
+- **Example**: PenState message includes only essential fields (tip_position, base_position, is_contact)
+- **Avoid**: Adding timestamp, stroke_id, or other "future-proofing" features until actually required
+- **Balance**: Prevent both over-engineering and under-engineering that leads to major refactoring
+
 ## Testing Infrastructure
 
 ### Automatic Path Resolution
