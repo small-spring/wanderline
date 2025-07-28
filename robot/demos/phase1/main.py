@@ -12,22 +12,25 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
 from visualization_msgs.msg import Marker, MarkerArray
+
+# tf2_ros: ROS 2 TF (TF: Transform Frame) library for coordinate transformations 
 from tf2_ros import TransformListener, Buffer
 from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
-import math
+
+# Import necessary libraries
 import time
 import yaml
-import csv
 from pathlib import Path
-from datetime import datetime
 
 # Import Phase 1 components
-from system_state import create_default_system_state, SystemState, ContactPoint
+from system_state import create_default_system_state, ContactPoint
 from coordinate_calculator import create_coordinate_calculator
+from config_loader import ConfigLoader
 
 # Import Canvas Preview Window (conditional for environments without OpenCV)
 try:
     from canvas_preview import create_preview_window
+    # path: 
     CANVAS_PREVIEW_AVAILABLE = True
 except ImportError:
     print("⚠️  Canvas Preview unavailable (OpenCV not found)")
@@ -43,10 +46,13 @@ else:
     sys.path.append('/Users/smallspring/programs/wanderline/robot/scripts')  # Local environment
 
 from canvas_coordinate_system import CanvasCoordinateSystem
+# wanderline/robot/scripts/canvas_coordinate_system.py
+
 from corrected_coordinate_system import CorrectedCoordinateSystem
+# wanderline/robot/scripts/corrected_coordinate_system.py
 
 
-class Phase1RobotDrawer(Node):
+class RobotDrawerNode(Node):
     """
     Phase 1 Robot Drawing Demo.
     Extends existing robot control with Phase 1 coordinate calculation.
@@ -56,7 +62,9 @@ class Phase1RobotDrawer(Node):
         super().__init__('phase1_robot_drawer')
         
         # Load configuration
-        self.config = self._load_config()
+        config_loader = ConfigLoader('config.yaml')
+        self.config = config_loader.load_config()
+        # wanderline/robot/demos/phase1/config.yaml
         
         # Initialize Phase 1 components
         self.system_state = create_default_system_state()
@@ -94,14 +102,10 @@ class Phase1RobotDrawer(Node):
         
         # ✅ DEBUG: Add coordinate debugging publisher
         from geometry_msgs.msg import PointStamped
+        
         self.debug_coords_pub = self.create_publisher(PointStamped, '/debug_coordinates', 10)
         
         self.pen_trail_points = []  # Store pen trail points
-        
-        # CSV logging for position analysis
-        self.csv_log_file = None
-        self.csv_writer = None
-        self._setup_csv_logging()
         
         # TF listener for accurate robot position
         self.tf_buffer = Buffer()
@@ -127,17 +131,17 @@ class Phase1RobotDrawer(Node):
         
         # Movement control (configurable)
         movement_config = self.config.get('movement', {})
-        self.enable_interpolation = movement_config.get('enable_interpolation', True)
+        
+
         self.interpolation_steps = movement_config.get('interpolation_steps', 25)
         self.current_step = 0
-        self.total_step_count = 0  # For CSV logging
         
         # Pen physical specifications (from config)
         pen_config = self.config.get('pen', {})
-        self.pen_total_length = pen_config.get('total_length', 0.15)  # 15cm default
-        self.pen_body_offset = pen_config.get('body_offset', 0.05)   # 5cm default  
-        self.pen_tip_offset = pen_config.get('tip_offset', 0.10)     # 10cm default
-        self.pen_diameter = pen_config.get('diameter', 0.012)        # 1.2cm default
+        self.pen_total_length = pen_config.get('total_length')  
+        self.pen_body_offset = pen_config.get('body_offset') 
+        self.pen_tip_offset = pen_config.get('tip_offset')
+        self.pen_diameter = pen_config.get('diameter')        # 1.2cm default
         
         # Debug: Log pen configuration
         self.get_logger().info(f"🖊️  Pen Config: Length={self.pen_total_length:.3f}m, TipOffset={self.pen_tip_offset:.3f}m")
@@ -152,59 +156,7 @@ class Phase1RobotDrawer(Node):
         
         self.get_logger().info("🎯 Phase 1 Robot Drawer started!")
         self.get_logger().info(f"📍 Starting at canvas center: {self.current_pixel_position}")
-        
-    def _setup_csv_logging(self):
-        """Setup CSV logging for position analysis."""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_dir = Path(__file__).parent / "coordinate_analysis"
-        log_dir.mkdir(exist_ok=True)
-        
-        csv_file_path = log_dir / f"pen_trail_analysis_{timestamp}.csv"
-        
-        try:
-            self.csv_log_file = open(csv_file_path, 'w', newline='')
-            self.csv_writer = csv.writer(self.csv_log_file)
-            
-            # Write CSV header
-            self.csv_writer.writerow([
-                'timestamp',
-                'step_count',
-                'target_pixel_x', 'target_pixel_y',
-                'actual_pixel_x', 'actual_pixel_y',
-                'pen_body_x', 'pen_body_y', 'pen_body_z',
-                'trail_contact_x', 'trail_contact_y', 'trail_contact_z',
-                'joint_0', 'joint_1', 'joint_2', 'joint_3', 'joint_4', 'joint_5',
-                'progress_percent', 'contact_count'
-            ])
-            
-            self.get_logger().info(f"📊 CSV logging started: {csv_file_path}")
-        except Exception as e:
-            self.get_logger().warning(f"⚠️ CSV logging failed to initialize: {e}")
-            self.csv_log_file = None
-            self.csv_writer = None
     
-    def _load_config(self) -> dict:
-        """Load configuration from YAML file."""
-        config_path = Path(__file__).parent / 'config.yaml'
-        try:
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-                return config['phase1']
-        except Exception as e:
-            self.get_logger().error(f"Failed to load config: {e}")
-            # Return minimal default config
-            return {
-                'robot': {
-                    'base_joints': [0.0, -1.2, -1.0, -1.5, 1.57, 0.0],
-                    'update_rate': 50
-                },
-                'drawing': {
-                    'segments': 24,
-                    'max_stroke_length': 0.005,
-                    'closure_threshold': 0.95,
-                    'perimeter_tolerance': 5.0
-                }
-            }
     
     def drawing_step(self):
         """Main drawing loop step."""
@@ -214,19 +166,6 @@ class Phase1RobotDrawer(Node):
         # ✅ Step 1: Get actual robot position using current interpolated joints
         actual_robot_pos = self._joints_to_robot_position(self.current_joints)
         actual_pixel_pos = self.corrected_coords.robot_to_pixel_coords(actual_robot_pos[0], actual_robot_pos[1])
-        
-        # DEBUG: Log actual robot position with consistent naming
-        if hasattr(self, '_debug_counter'):
-            self._debug_counter += 1
-        else:
-            self._debug_counter = 0
-            
-        if self._debug_counter % 10 == 0:  # Log every 10 steps
-            self.get_logger().info(
-                f"🔍 ACTUAL: Joints {[f'{j:.3f}' for j in self.current_joints[:3]]} → "
-                f"Robot({actual_robot_pos[0]:.3f},{actual_robot_pos[1]:.3f},{actual_robot_pos[2]:.3f}) → "
-                f"Pixel({actual_pixel_pos[0]:.1f},{actual_pixel_pos[1]:.1f})"
-            )
         
         # Validate pixel coordinates before proceeding
         if (actual_pixel_pos[0] < 0 or actual_pixel_pos[0] > 800 or 
@@ -292,18 +231,6 @@ class Phase1RobotDrawer(Node):
         tool_flange_target_y = pen_tip_target_y  
         tool_flange_target_z = pen_tip_target_z + self.pen_tip_offset  # Move tool flange UP by pen length
         
-        # Debug: Log position calculation every 25 calls
-        if not hasattr(self, '_position_calc_counter'):
-            self._position_calc_counter = 0
-        self._position_calc_counter += 1
-        
-        if self._position_calc_counter % 25 == 0:
-            self.get_logger().info(
-                f"🎯 POS CALC: Pixel({pixel_x:.1f},{pixel_y:.1f}) → "
-                f"PenTip({pen_tip_target_x:.3f},{pen_tip_target_y:.3f},{pen_tip_target_z:.3f}) → "
-                f"ToolFlange({tool_flange_target_x:.3f},{tool_flange_target_y:.3f},{tool_flange_target_z:.3f})"
-            )
-        
         # Step 3: Calculate joints for tool flange position
         joints = self.corrected_coords.robot_coords_to_joints(
             tool_flange_target_x, tool_flange_target_y, tool_flange_target_z, self.base_joints
@@ -315,53 +242,26 @@ class Phase1RobotDrawer(Node):
     
     def _execute_smooth_movement(self, target_joints: list):
         """Execute movement to target joints (with optional interpolation)."""
+        # === INTERPOLATED MOVEMENT (Original behavior) ===
+        if self.current_step >= self.interpolation_steps:
+            # Start new movement
+            self.current_joints = self.target_joints.copy()
+            self.target_joints = target_joints
+            self.current_step = 0
         
-        if self.enable_interpolation:
-            # === INTERPOLATED MOVEMENT (Original behavior) ===
-            if self.current_step >= self.interpolation_steps:
-                # Start new movement
-                self.current_joints = self.target_joints.copy()
-                self.target_joints = target_joints
-                self.current_step = 0
+        # Interpolate between current and target
+        progress = self.current_step / self.interpolation_steps
+        interpolated_joints = []
+        
+        for i in range(len(self.current_joints)):
+            interpolated = self.current_joints[i] + (self.target_joints[i] - self.current_joints[i]) * progress
+            interpolated_joints.append(interpolated)
+        
+        active_joints = interpolated_joints
+        self.current_step += 1
             
-            # Interpolate between current and target
-            progress = self.current_step / self.interpolation_steps
-            interpolated_joints = []
-            
-            for i in range(len(self.current_joints)):
-                interpolated = self.current_joints[i] + (self.target_joints[i] - self.current_joints[i]) * progress
-                interpolated_joints.append(interpolated)
-            
-            # Debug: Log interpolation progress
-            if hasattr(self, '_interp_debug_counter'):
-                self._interp_debug_counter += 1
-            else:
-                self._interp_debug_counter = 0
-                
-            if self._interp_debug_counter % 100 == 0:  # Log every 100 steps
-                self.get_logger().info(
-                    f"🎯 INTERP: Step {self.current_step}/{self.interpolation_steps} ({progress:.2f}) | "
-                    f"Joints[{interpolated_joints[0]:.3f}, {interpolated_joints[1]:.3f}, {interpolated_joints[2]:.3f}]"
-                )
-            
-            active_joints = interpolated_joints
-            self.current_step += 1
-            
-        else:
-            # === DIRECT MOVEMENT (No interpolation) ===
-            active_joints = target_joints
-            self.current_joints = target_joints.copy()
-            
-            # Debug: Log direct movement
-            if hasattr(self, '_direct_debug_counter'):
-                self._direct_debug_counter += 1
-            else:
-                self._direct_debug_counter = 0
-                
-            if self._direct_debug_counter % 25 == 0:  # Log every 25 steps
-                self.get_logger().info(
-                    f"🎯 DIRECT: Target joints [{target_joints[0]:.3f}, {target_joints[1]:.3f}, {target_joints[2]:.3f}]"
-                )
+
+
         
         # Common processing for both modes
         # Publish joint state
@@ -375,18 +275,6 @@ class Phase1RobotDrawer(Node):
         # ✅ CONSISTENT DESIGN: Both trail and pen tip use actual robot position
         actual_robot_pos = self._joints_to_robot_position(active_joints)
         
-        # Debug: Log actual robot position (consistent)
-        if hasattr(self, '_coord_log_counter'):
-            self._coord_log_counter += 1
-        else:
-            self._coord_log_counter = 0
-            
-        if self._coord_log_counter % 50 == 0:  # Log actual robot position
-            mode_str = "INTERPOLATED" if self.enable_interpolation else "DIRECT"
-            self.get_logger().info(
-                f"🎯 {mode_str}: Robot Position({actual_robot_pos[0]:.3f},{actual_robot_pos[1]:.3f},{actual_robot_pos[2]:.3f})"
-            )
-        
         # ✅ Both trail and pen tip use SAME pen tip position (真の一致)
         pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(active_joints)
         self._add_pen_trail_point(pen_tip_pos)  # Trail = ペン先位置
@@ -394,32 +282,12 @@ class Phase1RobotDrawer(Node):
         
         # ✅ DEBUG: Publish coordinate for external monitoring
         self._publish_debug_coordinates(actual_robot_pos)
-        
-        # CSV logging temporarily disabled to avoid errors
-        
-        self.total_step_count += 1
     
     def _joints_to_robot_position(self, joints: list) -> tuple:
         """Convert joint positions to robot position using corrected forward kinematics."""
         # Use corrected forward kinematics
         return self.corrected_coords.joints_to_robot_position(joints)
         
-        # Debug: Log actual robot hand position
-        if hasattr(self, '_position_log_counter'):
-            self._position_log_counter += 1
-        else:
-            self._position_log_counter = 0
-            
-        if self._position_log_counter % 50 == 0:  # Log every 50 updates
-            # Also convert back to pixel to check consistency
-            pixel_x, pixel_y = self.canvas_system.robot_to_pixel_coords(x, y)
-            self.get_logger().info(
-                f"🤚 Robot: X={x:.3f}, Y={y:.3f}, Z={z:.3f} | "
-                f"Pixel: ({pixel_x:.1f}, {pixel_y:.1f}) | "
-                f"Joints: pan={pan_angle:.3f}, lift={lift_angle:.3f}"
-            )
-        
-        return (x, y, z)
     
     def _simulate_contact_detection(self, pixel_coord: tuple):
         """Simulate contact detection and update system state."""
@@ -731,7 +599,7 @@ def main(args=None):
     rclpy.init(args=args)
     
     try:
-        drawer = Phase1RobotDrawer()
+        drawer = RobotDrawerNode()
         
         print("✅ Phase 1 demo started successfully!")
         print("🎯 Drawing circle with Phase 1 algorithm...")

@@ -17,10 +17,10 @@ phase1:
     
   # Pen physical specifications (復旧: 1m pen that was working)
   pen:
-    total_length: 1.0         # 1m total pen length (WORKING STATE)
-    body_offset: 0.5          # 50cm from tool flange to pen center
-    tip_offset: 1.0           # 1m from tool flange to pen tip
-    diameter: 0.012           # 1.2cm pen diameter
+    total_length: 0.12         # m total pen length (WORKING STATE)
+    body_offset: 0.20          # m from tool flange to pen center
+    tip_offset: 0.20          # m from tool flange to pen tip
+    diameter: 0.012           # m pen diameter
     
   # Circle drawing (minimal)
   drawing:

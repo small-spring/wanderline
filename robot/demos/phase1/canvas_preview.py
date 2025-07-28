@@ -84,12 +84,18 @@ class CanvasPreviewWindow:
                 
                 # Create and display initial placeholder (Wanderline style)
                 placeholder = np.ones((self.canvas_height, self.canvas_width, 3), dtype=np.uint8) * 50
-                cv2.putText(placeholder, "Phase 1 - Canvas Preview", (50, self.canvas_height//2), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                cv2.putText(placeholder, "Waiting for robot drawing...", (50, self.canvas_height//2 + 50), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2)
-                cv2.putText(placeholder, "Press 'q' to quit", (50, self.canvas_height//2 + 100), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 2)
+                cv2.putText(
+                    placeholder, "Phase 1 - Canvas Preview", (50, self.canvas_height//2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2
+                )
+                cv2.putText(
+                    placeholder, "Waiting for robot drawing...", (50, self.canvas_height//2 + 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 2
+                )
+                cv2.putText(
+                    placeholder, "Press 'q' to quit", (50, self.canvas_height//2 + 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (150, 150, 150), 2
+                )
                 
                 cv2.imshow(self.window_name, placeholder)
                 
