@@ -201,6 +201,11 @@ Each run creates a timestamped directory in `outputs/` containing:
 - English-only comments and documentation
 - Clear, descriptive variable names
 
+### Robot Project Configuration Philosophy
+- **No Default Values in Code**: Configuration scripts should fail with clear error messages when required config values are missing, rather than providing default values
+- **Config Responsibility**: All default values should be explicitly defined in YAML config files, not in Python code
+- **Fail Fast**: Better to crash early with a clear config error than run with unexpected default behavior
+
 ### YAGNI Principle (You Aren't Gonna Need It)
 - **Definition**: Don't implement features you don't currently need
 - **Application**: Phase1 focuses on drawing functionality; prioritize simplicity over future extensibility
