@@ -1,48 +1,21 @@
-# Phase 1 Configuration - Minimal setup for testing
-
-phase1:
-  # Robot parameters (from existing system)
   robot:
-    base_joints: [-0.226, -0.820, 1.410, -1.570, 4.713, 0.000]  # Corrected wrist orientation: 1.570 + 3.14159 = 4.713
-    update_rate: 50  # 50Hz like existing system
-    
-  # Canvas parameters (from existing system)
+    update_rate: 50
+
   canvas:
-    physical_size: 0.4        # 40cm
-    pixel_width: 800          
-    pixel_height: 600         
-    position: [0.6, 0.0, 0.05] # Elevated canvas for realistic pen length
-    contact_height: 0.02      # 2cm realistic pen length
-    safe_height: 0.05         # 5cm safe movement height
-    
-  # Pen physical specifications (復旧: 1m pen that was working)
+    position: [0.6, 0.0, 0.05]
+    physical_size: 0.4
+    pixel_width: 800
+    pixel_height: 600
+    contact_height: 0.02
+    safe_height: 0.05
+
   pen:
-    total_length: 0.12         # m total pen length (WORKING STATE)
-    body_offset: 0.20          # m from tool flange to pen center
-    tip_offset: 0.20          # m from tool flange to pen tip
-    diameter: 0.012           # m pen diameter
-    
-  # Circle drawing (minimal)
+    length: 0.12
+
   drawing:
-    circle_center: [400, 300]  # Canvas center
-    circle_radius: 80          # 80 pixels
-    segments: 24               # 24 segments for smooth circle
-    
-  # Contact detection (basic)
-  contact_detection:
-    z_tolerance: 0.005         # 5mm tolerance
-    
-  # Performance (minimal)
-  performance:
-    robot_update_rate: 50
-    canvas_update_rate: 30
-    
-  # Movement control
+    circle_center: [400, 300]
+    circle_radius: 80
+    segments: 24
+
   movement:
-    enable_interpolation: true    # Re-enable interpolation for smooth drawing
-    interpolation_steps: 10       # Reduced to 10 for faster movement (was 100)
-    
-  # CSV logging for debugging (configurable)
-  csv_logging:
-    enabled: true  # Set to false to disable CSV logging
-    flush_interval: 50  # Flush every N steps
+    interpolation_steps: 10

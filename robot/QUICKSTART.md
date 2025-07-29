@@ -69,6 +69,7 @@ ros2 launch /workspace/robot/launch/ur5e_standard.launch.py jsp_gui:=false use_r
 cd /workspace/robot/demos/phase1
 source /opt/ros/humble/setup.bash
 source /home/ubuntu/ros2_ws/install/setup.bash
+source install/setup.bash 
 export ROS_DOMAIN_ID=0
 export DISPLAY=:1.0
 python3 main.py

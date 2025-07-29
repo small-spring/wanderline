@@ -21,7 +21,5 @@ class ConfigLoader:
         if config is None:
             raise ValueError(f"❌ YAML file is empty.")
         
-        if 'phase1' not in config:
-            raise KeyError(f"❌ Missing 'phase1' section in config file: {self.config_path}")
-        
-        return config['phase1']
+        # Direct config structure (no phase1 wrapper needed)
+        return config

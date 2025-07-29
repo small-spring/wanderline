@@ -8,6 +8,9 @@ Integrates Phase 1 components with existing robot control system.
 # rclpy: ROS 2 Python client library
 import rclpy 
 from rclpy.node import Node
+import rclpy.time
+import rclpy.duration
+from geometry_msgs.msg import PointStamped
 
 # Message libraries
 from sensor_msgs.msg import JointState
@@ -15,7 +18,8 @@ from std_msgs.msg import Header
 
 # tf2_ros: ROS 2 TF (TF: Transform Frame) library for coordinate transformations 
 from tf2_ros import TransformListener, Buffer
-from tf2_ros import LookupException, ConnectivityException, ExtrapolationException
+import tf2_geometry_msgs  # Required for PointStamped message transform support.
+# although not explicitly used, it's good practice to import it for future use
 
 # Import necessary libraries
 import time
@@ -29,19 +33,11 @@ from config_loader import ConfigLoader
 try:
     from canvas_preview import create_preview_window
     # path: 
-    CANVAS_PREVIEW_AVAILABLE = False
+    CANVAS_PREVIEW_AVAILABLE = True
 except ImportError:
     print("⚠️  Canvas Preview unavailable (OpenCV not found)")
     CANVAS_PREVIEW_AVAILABLE = False
 
-# Import existing coordinate system
-import sys
-import os
-# Support both local and VNC environments
-if os.path.exists('/workspace/robot/scripts'):
-    sys.path.append('/workspace/robot/scripts')  # VNC environment
-else:
-    sys.path.append('/Users/smallspring/programs/wanderline/robot/scripts')  # Local environment
 
 from canvas_coordinate_system import CanvasCoordinateSystem
 # wanderline/robot/scripts/canvas_coordinate_system.py
@@ -72,7 +68,7 @@ class RobotDrawerNode(Node):
         self.system_state = create_default_system_state()
         self.coord_calculator = create_coordinate_calculator(self.config['drawing'])
         self.canvas_system = CanvasCoordinateSystem(self.config)
-        self.corrected_coords = CorrectedCoordinateSystem()  # Use corrected coordinate system
+        self.corrected_coords = CorrectedCoordinateSystem(self.config)  # Use corrected coordinate system
         
         # Initialize Canvas Preview Window (if available)
         self.canvas_preview = None
@@ -113,7 +109,9 @@ class RobotDrawerNode(Node):
         ]
         
         # Robot state
-        self.base_joints = self.config['robot']['base_joints']
+        # TODO: canvas位置から初期姿勢の計算関数を作る
+        # self.base_joints = self.corrected_coords.calculate_optimal_base_joints(self.config['canvas']['position'])
+        self.base_joints = [0.0, -1.57, 1.57, -1.57, -1.57, 0.0]  # HARDCODE: temporary until auto-calculation
         self.current_joints = self.base_joints.copy()
         self.target_joints = self.base_joints.copy()
         
@@ -124,19 +122,13 @@ class RobotDrawerNode(Node):
         # Movement control (configurable)
         movement_config = self.config.get('movement', {})
         
-
         self.interpolation_steps = movement_config.get('interpolation_steps', 25)
         self.current_step = 0
         
         # Pen physical specifications (from config)
-        pen_config = self.config.get('pen', {})
-        # self.pen_total_length = pen_config.get('total_length')  
-        # self.pen_body_offset = pen_config.get('body_offset') 
-        self.pen_tip_offset = pen_config.get('tip_offset')
-        # self.pen_diameter = pen_config.get('diameter')        # 1.2cm default
+        pen_config = self.config.get('pen')
+        self.pen_length = pen_config.get('length')  
         
-        # Debug: Log pen configuration
-        # self.get_logger().info(f"🖊️  Pen Config: Length={self.pen_total_length:.3f}m, TipOffset={self.pen_tip_offset:.3f}m")
         self.get_logger().info(f"🖊️  Canvas at Z={self.canvas_system.canvas_position[2]:.3f}m")
         
         # Timer for smooth movement
@@ -155,9 +147,9 @@ class RobotDrawerNode(Node):
         if not self.drawing_active:
             return
             
-        # ✅ Step 1: Get actual robot position using current interpolated joints
-        actual_robot_pos = self._joints_to_robot_position(self.current_joints)
-        actual_pixel_pos = self.corrected_coords.robot_to_pixel_coords(actual_robot_pos[0], actual_robot_pos[1])
+        # ✅ Step 1: Get actual wrist3 position using current interpolated joints
+        actual_wrist3_pos = self._joints_to_wrist3_position(self.current_joints)
+        actual_pixel_pos = self.corrected_coords.robot_to_pixel_coords(actual_wrist3_pos[0], actual_wrist3_pos[1])
         
         # Validate pixel coordinates before proceeding
         if (actual_pixel_pos[0] < 0 or actual_pixel_pos[0] > 800 or 
@@ -178,9 +170,6 @@ class RobotDrawerNode(Node):
             # Reset for continuous circles
             self.system_state = create_default_system_state()
             self.current_pixel_position = (400, 300)  # Reset to center
-            # ✅ Keep pen trail for continuous drawing visualization
-            # self.pen_trail_points.clear()  # Disabled - keep trail visible
-            # Don't stop drawing - continue with new circle
             
         if next_coord is None:
             self.get_logger().warning("⚠️ No next coordinate calculated")
@@ -221,13 +210,13 @@ class RobotDrawerNode(Node):
         # Pen tip is pen_tip_offset BELOW tool flange, so tool flange should be ABOVE
         tool_flange_target_x = pen_tip_target_x
         tool_flange_target_y = pen_tip_target_y  
-        tool_flange_target_z = pen_tip_target_z + self.pen_tip_offset  # Move tool flange UP by pen length
+        tool_flange_target_z = pen_tip_target_z + self.pen_length  # Move tool flange UP by pen length
         
-        # Step 3: Calculate joints for tool flange position
-        joints = self.corrected_coords.robot_coords_to_joints(
+        # Step 3: Calculate joints for tool_flange position
+        joints = self.corrected_coords.wrist3_coords_to_joints(
             tool_flange_target_x, tool_flange_target_y, tool_flange_target_z, self.base_joints
         )
-        joints[4] = 1.57 + 3.14159   # Wrist 2 perpendicular + 180° rotation (for canvas orientation)
+        joints[4] = 1.57 # Wrist 2 perpendicular + 180° rotation (for canvas orientation)
         joints[5] = 0.0   # Wrist 3 no rotation
         
         return joints
@@ -258,27 +247,64 @@ class RobotDrawerNode(Node):
         
         # Update robot state in system state
         joint_dict = dict(zip(self.joint_names, active_joints))
-        robot_pos = self._joints_to_robot_position(active_joints)
-        self.system_state.update_robot_position(joint_dict, robot_pos)
+        wrist3_pos = self._joints_to_wrist3_position(active_joints)
+        self.system_state.update_robot_position(joint_dict, wrist3_pos)
         
-        # ✅ Both trail and pen tip use SAME pen tip position (真の一致)
-        pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(active_joints)
-        pen_base_pos = self._joints_to_robot_position(active_joints)
+
+        # Get transform from base_link to tool0 (pen tip)
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                "base_link", "tool0",
+                rclpy.time.Time(), 
+                timeout=rclpy.duration.Duration(seconds=1.0)
+            )
+        except Exception as e:
+            self.get_logger().error(f"❌ TF lookup failed: {e}")
+            return
+        # todo: Handle exceptions if transform lookup fails
+
+        # position of pen base = tool0 position
+        pen_base_pos = (
+            transform.transform.translation.x,
+            transform.transform.translation.y,
+            transform.transform.translation.z
+        )
+
+        # compute pen tip position
+        pen_tip_in_tool0 = PointStamped()
+        pen_tip_in_tool0.header.frame_id = "tool0"
+        pen_tip_in_tool0.header.stamp = rclpy.time.Time().to_msg()
+        pen_tip_in_tool0.point.x = 0.0  # Pen tip at tool
+        pen_tip_in_tool0.point.y = 0.0
+        pen_tip_in_tool0.point.z = self.pen_length  # Pen length above tool flange 
+        try:
+            # Transform pen tip to base_link frame
+            pen_tip_in_base_link = self.tf_buffer.transform(
+                pen_tip_in_tool0, "base_link", 
+                timeout=rclpy.duration.Duration(seconds=1.0)
+            )
+        except Exception as e:
+            self.get_logger().error(f"❌ TF transform failed: {e}")
+            return
+
+        pen_tip_pos = (
+            pen_tip_in_base_link.point.x,
+            pen_tip_in_base_link.point.y,
+            pen_tip_in_base_link.point.z
+        )
+        # todo: Handle exceptions if transform fails
+
         self._publish_pen_state(
             pen_tip_pos=pen_tip_pos, 
             pen_body_pos=pen_base_pos, 
             is_contact=True # TODO: Determine actual contact state
         )
-        # self._add_pen_trail_point(pen_tip_pos)  # Trail = ペン先位置
-        # self._publish_pen_markers(pen_tip_pos)  # Pen tip = ペン先位置
-        
-        # ✅ DEBUG: Publish coordinate for external monitoring
-        # self._publish_debug_coordinates(actual_robot_pos)
+
     
-    def _joints_to_robot_position(self, joints: list) -> tuple:
-        """Convert joint positions to robot position using corrected forward kinematics."""
+    def _joints_to_wrist3_position(self, joints: list) -> tuple:
+        """Convert joint positions to wrist3 position using corrected forward kinematics."""
         # Use corrected forward kinematics
-        return self.corrected_coords.joints_to_robot_position(joints)
+        return self.corrected_coords.joints_to_wrist3_position(joints)
         
     
     def _simulate_contact_detection(self, pixel_coord: tuple):
@@ -334,7 +360,6 @@ class RobotDrawerNode(Node):
         msg.base_position.z = pen_body_pos[2]
         msg.is_contact = is_contact
         self.penstate_pub.publish(msg)
-  
     
     def _calculate_trail_display_position(self, pen_tip_pos: tuple) -> tuple:
         """Calculate trail display position for RViz visualization."""
