@@ -43,8 +43,8 @@ except ImportError:
 from canvas_coordinate_system import CanvasCoordinateSystem
 # wanderline/robot/scripts/canvas_coordinate_system.py
 
-from corrected_coordinate_system import CorrectedCoordinateSystem
-# wanderline/robot/scripts/corrected_coordinate_system.py
+from robot_motion_system import RobotMotionSystem
+# wanderline/robot/demos/phase1/robot_motion_system.py
 
 # Import message types for RViz visualization (todo: move to separate file later)
 from phase1_robot_drawing.msg import PenState
@@ -88,7 +88,7 @@ class RobotDrawerNode(Node):
         self.coord_calculator = create_coordinate_calculator(self.config['drawing']) 
         # self.config['drawing'] とは何？ 描画ターゲットの中心点の座標など
         self.canvas_system = CanvasCoordinateSystem(self.config)
-        self.corrected_coords = CorrectedCoordinateSystem(self.config, self.tf_buffer)  # TF2-enhanced coordinate system
+        self.motion_system = RobotMotionSystem(self.config, self.tf_buffer)  # TF2-enhanced motion system
         
         # ------- Initialize Canvas Preview Window (if available) -------
         self.canvas_preview = None
@@ -136,7 +136,7 @@ class RobotDrawerNode(Node):
         
         # Robot state
         # TODO: canvas位置から初期姿勢の計算関数を作る
-        # self.base_joints = self.corrected_coords.calculate_optimal_base_joints(self.config['canvas']['position'])
+        # self.base_joints = self.motion_system.calculate_optimal_base_joints(self.config['canvas']['position'])
         self.base_joints = [0.0, -1.0, 1.3, -1.57, -1.57, 0.0]  # Balanced posture: shoulder -57°, elbow 74°
 
         self.current_joints = self.base_joints.copy()
@@ -169,7 +169,7 @@ class RobotDrawerNode(Node):
         self.get_logger().info(f"🖊️  Pen down at pixel ({pixel_x}, {pixel_y})")
         
         # Step 1: Convert "pixel frame" to "robot base frame"
-        robot_x, robot_y, robot_z = self.corrected_coords.pixel_to_robot_coords(
+        robot_x, robot_y, robot_z = self.motion_system.pixel_to_robot_coords(
             pixel_x, pixel_y, pen_down=True
         )
         # Step 2: Canvas表面の正確な高さを取得
@@ -182,7 +182,7 @@ class RobotDrawerNode(Node):
         tool_flange_z = pen_tip_target_z + self.pen_length  # ペン長分上に移動
 
         # Step 4: 関節角度を計算
-        target_joints = self.corrected_coords.wrist3_coords_to_joints(
+        target_joints = self.motion_system.wrist3_coords_to_joints(
             tool_flange_x, tool_flange_y, tool_flange_z, self.base_joints
         )
         target_joints[4] = 1.57  # Wrist 2: ペン下向き（Canvas向き）
@@ -209,7 +209,7 @@ class RobotDrawerNode(Node):
             
         # ✅ Step 1: Get actual wrist3 position using current interpolated joints
         actual_wrist3_pos = self._joints_to_wrist3_position(self.current_joints)
-        actual_pixel_pos = self.corrected_coords.robot_to_pixel_coords(actual_wrist3_pos[0], actual_wrist3_pos[1])
+        actual_pixel_pos = self.motion_system.robot_to_pixel_coords(actual_wrist3_pos[0], actual_wrist3_pos[1])
         
         # Validate pixel coordinates before proceeding
         if (actual_pixel_pos[0] < 0 or actual_pixel_pos[0] > 800 or 
@@ -258,7 +258,7 @@ class RobotDrawerNode(Node):
     def _pixel_to_joint_position(self, pixel_x: float, pixel_y: float) -> list:
         """Convert pixel coordinates to joint positions using TF2-guided calculation."""
         # TF2ガイド付き計算を使用
-        joints = self.corrected_coords.tf2_guided_pixel_to_joints(
+        joints = self.motion_system.tf2_guided_pixel_to_joints(
             pixel_x, pixel_y, self.base_joints
         )
         
@@ -347,19 +347,19 @@ class RobotDrawerNode(Node):
     def _joints_to_wrist3_position(self, joints: list) -> tuple:
         """Convert joint positions to wrist3 position using corrected forward kinematics."""
         # Use corrected forward kinematics
-        return self.corrected_coords.joints_to_wrist3_position(joints)
+        return self.motion_system.joints_to_wrist3_position(joints)
         
     
     def _simulate_contact_detection(self, pixel_coord: tuple):
         """Simulate contact detection and update system state."""
         # ✅ CONSISTENT: Use pen tip position (same as trail and display)
-        pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(self.current_joints) # ok
+        pen_tip_pos = self.motion_system.joints_to_pen_tip_position(self.current_joints) # ok
         
         # Calculate pen-canvas contact point using pen tip position
         pen_contact_pos = self._calculate_trail_display_position(pen_tip_pos)
         
         # Convert contact position to pixel coordinates for canvas preview
-        contact_pixel = self.corrected_coords.robot_to_pixel_coords(
+        contact_pixel = self.motion_system.robot_to_pixel_coords(
             pen_contact_pos[0], pen_contact_pos[1]
         )
         
