@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Calculate appropriate base_joints for canvas position."""
 
-from corrected_coordinate_system import CorrectedCoordinateSystem
+from robot.demos.phase1.corrected_coordinate_system import CorrectedCoordinateSystem
 import math
 
 def main():
@@ -18,11 +18,11 @@ def main():
     print()
     
     # Calculate required joints
-    joints = coords.robot_coords_to_joints(target_x, target_y, target_z, base_joints)
+    joints = coords.wrist3_coords_to_joints(target_x, target_y, target_z, base_joints)
     print(f"Required joints: [{joints[0]:.3f}, {joints[1]:.3f}, {joints[2]:.3f}, {joints[3]:.3f}, {joints[4]:.3f}, {joints[5]:.3f}]")
     
     # Verify with forward kinematics  
-    actual_pos = coords.joints_to_robot_position(joints)
+    actual_pos = coords.joints_to_wrist3_position(joints)
     print(f"Actual position: ({actual_pos[0]:.3f}, {actual_pos[1]:.3f}, {actual_pos[2]:.3f})")
     
     # Convert back to pixels

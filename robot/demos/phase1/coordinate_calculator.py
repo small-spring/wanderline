@@ -4,6 +4,8 @@ Coordinate Calculator for Phase 1 Robot Drawing
 
 Module 1: Calculate where to draw next based on current canvas state.
 Implements circle drawing algorithm with contact-based progress tracking.
+
+Moving planner for trajectory generation.
 """
 
 import math
@@ -25,8 +27,10 @@ class CircleCoordinateCalculator:
         self.closure_threshold = config.get('closure_threshold', 0.95)  # 95% completion
         self.perimeter_tolerance = config.get('perimeter_tolerance', 5.0)  # 5 pixels
         
-    def calculate_next_coordinate(self, current_position: Tuple[float, float], 
-                                 canvas_state: SystemState) -> Tuple[Optional[Tuple[float, float]], bool]:
+    def calculate_next_coordinate(
+            self, current_position: Tuple[float, float], 
+            canvas_state: SystemState
+        ) -> Tuple[Optional[Tuple[float, float]], bool]:
         """
         Calculate next coordinate for circle drawing.
         
@@ -121,14 +125,18 @@ class CircleCoordinateCalculator:
         
         # Debug: Log progress calculation details
         if len(canvas_state.contact_history) % 10 == 0:  # Log every 10 contacts
-            print(f"🔍 PROGRESS DEBUG: Contacts={len(canvas_state.contact_history)} | "
-                  f"QuadrantsCovered={quadrants_covered}/4 ({angle_progress:.3f}) | "
-                  f"ContactProgress={contact_progress:.3f} | Final={final_progress:.3f}")
-        
+            print(
+                f"🔍 PROGRESS DEBUG: Contacts={len(canvas_state.contact_history)} | "
+                f"QuadrantsCovered={quadrants_covered}/4 ({angle_progress:.3f}) | "
+                f"ContactProgress={contact_progress:.3f} | Final={final_progress:.3f}"
+            )
+
         return final_progress
     
-    def _get_next_circle_point(self, current_progress: float, target_circle: TargetCircle, 
-                              current_position: Tuple[float, float]) -> Tuple[float, float]:
+    def _get_next_circle_point(
+            self, current_progress: float, target_circle: TargetCircle, 
+            current_position: Tuple[float, float]
+        ) -> Tuple[float, float]:
         """
         Calculate next point on circle circumference.
         
@@ -162,9 +170,11 @@ class CircleCoordinateCalculator:
         self._movement_debug_counter += 1
         
         if self._movement_debug_counter % 50 == 0:
-            print(f"🎯 CIRCLE MOVE: Current({current_x:.1f},{current_y:.1f}) → "
-                  f"Next({next_x:.1f},{next_y:.1f}) | Angle: {math.degrees(current_angle):.1f}° → {math.degrees(next_angle):.1f}°")
-        
+            print(
+                f"🎯 CIRCLE MOVE: Current({current_x:.1f},{current_y:.1f}) → "
+                f"Next({next_x:.1f},{next_y:.1f}) | Angle: {math.degrees(current_angle):.1f}° → {math.degrees(next_angle):.1f}°"
+            )
+
         # Ensure stroke length doesn't exceed maximum (5 pixels max step)
         distance = math.sqrt((next_x - current_x)**2 + (next_y - current_y)**2)
         max_pixel_step = 5.0  # 5 pixels maximum step
