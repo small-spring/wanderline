@@ -129,7 +129,6 @@ class CanvasPreviewWindow:
             # Process updates at specified frequency
             if len(self.pending_contacts) >= self.update_frequency:
                 self._process_pending_contacts()
-                print("[DEBUG] Processed pending contacts")
 
     def _process_pending_contacts(self):
         """Process all pending contact points and update canvas."""

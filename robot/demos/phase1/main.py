@@ -81,10 +81,14 @@ class RobotDrawerNode(Node):
             # - completion_percentage: float - 描画完了率
             # - target_shape: TargetCircle - 目標図形（中央(400,300) in pixel frame、半径80の円）
 
+        # TF listener for accurate robot position (initialize early for CorrectedCoordinateSystem)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        
         self.coord_calculator = create_coordinate_calculator(self.config['drawing']) 
         # self.config['drawing'] とは何？ 描画ターゲットの中心点の座標など
         self.canvas_system = CanvasCoordinateSystem(self.config)
-        self.corrected_coords = CorrectedCoordinateSystem(self.config)  # Use corrected coordinate system ???
+        self.corrected_coords = CorrectedCoordinateSystem(self.config, self.tf_buffer)  # TF2-enhanced coordinate system
         
         # ------- Initialize Canvas Preview Window (if available) -------
         self.canvas_preview = None
@@ -119,9 +123,7 @@ class RobotDrawerNode(Node):
         # Pen state publisher for RViz visualization -> RvizViewNode
         self.penstate_pub = self.create_publisher(PenState, '/pen_state', 10)
         
-        # TF listener for accurate robot position
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
+        # TF listener already initialized above for CorrectedCoordinateSystem
         
         self.joint_names = [
             'shoulder_pan_joint',
@@ -135,7 +137,7 @@ class RobotDrawerNode(Node):
         # Robot state
         # TODO: canvas位置から初期姿勢の計算関数を作る
         # self.base_joints = self.corrected_coords.calculate_optimal_base_joints(self.config['canvas']['position'])
-        self.base_joints = [0.0, -1.57, 1.57, -1.57, -1.57, 0.0]  # HARDCODE: temporary until auto-calculation
+        self.base_joints = [0.0, -1.0, 1.3, -1.57, -1.57, 0.0]  # Balanced posture: shoulder -57°, elbow 74°
 
         self.current_joints = self.base_joints.copy()
         self.target_joints = self.base_joints.copy() # ?
@@ -254,26 +256,11 @@ class RobotDrawerNode(Node):
         )
     
     def _pixel_to_joint_position(self, pixel_x: float, pixel_y: float) -> list:
-        """Convert pixel coordinates to joint positions considering pen tip offset."""
-        # Step 1: Convert pixel to pen tip target position (Canvas面接触)
-        pen_tip_target_x, pen_tip_target_y, _ = self.corrected_coords.pixel_to_robot_coords(
-            pixel_x, pixel_y, pen_down=True
+        """Convert pixel coordinates to joint positions using TF2-guided calculation."""
+        # TF2ガイド付き計算を使用
+        joints = self.corrected_coords.tf2_guided_pixel_to_joints(
+            pixel_x, pixel_y, self.base_joints
         )
-        # Override Z coordinate to Canvas surface contact height
-        canvas_z = self.canvas_system.canvas_position[2]  # Canvas surface at 5cm
-        pen_tip_target_z = canvas_z + 0.001  # Just touch Canvas surface (1mm above)
-        
-        # Step 2: Calculate tool flange target position (reverse pen tip calculation)
-        tool_flange_target_x = pen_tip_target_x
-        tool_flange_target_y = pen_tip_target_y  
-        tool_flange_target_z = pen_tip_target_z + self.pen_length  # Move tool flange UP by pen length
-        
-        # Step 3: Calculate joints for tool_flange position
-        joints = self.corrected_coords.wrist3_coords_to_joints(
-            tool_flange_target_x, tool_flange_target_y, tool_flange_target_z, self.base_joints
-        )
-        joints[4] = 1.57 # Wrist 2 perpendicular + 180° rotation (for canvas orientation)
-        joints[5] = 0.0   # Wrist 3 no rotation
         
         return joints
     
