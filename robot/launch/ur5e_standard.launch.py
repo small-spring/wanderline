@@ -76,12 +76,12 @@ def generate_launch_description():
 
     # Joint state publisher (no GUI) - runs when jsp_gui=false
     # NOTE: Disabled to avoid conflict with programmatic control
-    # joint_state_publisher_node = Node(
-    #     package='joint_state_publisher',
-    #     executable='joint_state_publisher',
-    #     name='joint_state_publisher',
-    #     condition=UnlessCondition(jsp_gui)
-    # )
+    joint_state_publisher_node = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        name='joint_state_publisher',
+        condition=UnlessCondition(jsp_gui)
+    )
 
     # Joint state publisher GUI - runs when jsp_gui=true
     joint_state_publisher_gui_node = Node(
@@ -92,9 +92,7 @@ def generate_launch_description():
     )
 
     # RViz (optional)
-    rviz_config_file = PathJoinSubstitution([
-        FindPackageShare("ur_description"), "rviz", "view_robot.rviz"
-    ])
+    rviz_config_file = "/workspace/robot/rviz/my_phase1_config.rviz"
     
     rviz_node = Node(
         package="rviz2",

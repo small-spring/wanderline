@@ -59,7 +59,7 @@ class SystemState:
     """
     # Robot state
     robot_joint_positions: Dict[str, float] = field(default_factory=dict)
-    calculated_pen_position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    calculated_wrist3_position: Tuple[float, float, float] = (0.0, 0.0, 0.0)
     pen_contact_state: bool = False
     
     # Canvas state  
@@ -86,10 +86,15 @@ class SystemState:
             ) * 255  # White canvas
     
     def update_robot_position(self, joint_positions: Dict[str, float], 
-                            pen_position: Tuple[float, float, float]):
-        """Update robot state with new positions."""
+                            wrist3_position: Tuple[float, float, float]):
+        """Update robot state with new positions.
+        
+        Args:
+            joint_positions: Robot joint angles in radians
+            wrist3_position: Wrist3 position in robot base_link coordinate system (meters)
+        """
         self.robot_joint_positions = joint_positions.copy()
-        self.calculated_pen_position = pen_position
+        self.calculated_wrist3_position = wrist3_position
         self.last_update_timestamp = time.time()
     
     def add_contact_point(self, contact_point: ContactPoint):
@@ -121,9 +126,9 @@ class SystemState:
         self.completion_percentage = max(0.0, min(1.0, percentage))
         self.last_update_timestamp = time.time()
     
-    def get_current_pen_position(self) -> Tuple[float, float, float]:
-        """Get current pen position."""
-        return self.calculated_pen_position
+    def get_current_wrist3_position(self) -> Tuple[float, float, float]:
+        """Get current wrist3 position in robot base_link coordinate system."""
+        return self.calculated_wrist3_position
     
     def get_contact_count(self) -> int:
         """Get total number of contact points."""
@@ -140,7 +145,7 @@ class SystemState:
     def get_system_status(self) -> Dict:
         """Get comprehensive system status."""
         return {
-            'pen_position': self.calculated_pen_position,
+            'wrist3_position': self.calculated_wrist3_position,
             'pen_contact': self.pen_contact_state,
             'contact_count': self.get_contact_count(),
             'stroke_count': self.get_stroke_count(),

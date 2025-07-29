@@ -13,7 +13,6 @@ import threading
 from typing import Tuple, List, Optional
 from system_state import SystemState, ContactPoint
 
-
 class CanvasPreviewWindow:
     """
     Real-time canvas preview window for Phase 1 robot drawing.
@@ -121,13 +120,17 @@ class CanvasPreviewWindow:
         Args:
             contact_point: Contact point with 3D robot position and 2D pixel coordinates
         """
+
         with self.update_lock:
+            # print(f"[DEBUG] update_from_contact exiting (thread={threading.current_thread().name})")
             self.pending_contacts.append(contact_point)
-            
+            # print(f"[DEBUG] Pending contacts: {self.pending_contacts}")
+
             # Process updates at specified frequency
             if len(self.pending_contacts) >= self.update_frequency:
                 self._process_pending_contacts()
-    
+                print("[DEBUG] Processed pending contacts")
+
     def _process_pending_contacts(self):
         """Process all pending contact points and update canvas."""
         for contact in self.pending_contacts:
@@ -263,9 +266,11 @@ class CanvasPreviewWindow:
             (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
             
             # Draw background rectangle
-            cv2.rectangle(image, (10, y_pos - text_height - 5), 
-                         (15 + text_width, y_pos + baseline + 5), (255, 255, 255), -1)
-            
+            cv2.rectangle(
+                image, (10, y_pos - text_height - 5),
+                (15 + text_width, y_pos + baseline + 5), (255, 255, 255), -1
+            )
+
             # Draw text
             cv2.putText(image, text, (12, y_pos), font, font_scale, color, thickness)
     
@@ -299,14 +304,22 @@ class CanvasPreviewWindow:
             cv2.imwrite(filepath, self.canvas_image)
             print(f"💾 Canvas saved to {filepath}")
     
-    def close(self):
-        """Close the preview window and cleanup."""
+    def cleanup(self):
+        """Safe cleanup for Qt timer issues."""
         self.running = False
         self.window_closed = True
         
-        if self.window_created:
-            cv2.destroyWindow(self.window_name)
-            print("🔄 Canvas preview window closed")
+        try:
+            if self.window_created and self.display_available:
+                cv2.destroyWindow(self.window_name)
+                cv2.waitKey(1)  # Process pending events
+                print("🔄 Canvas preview window closed")
+        except Exception as e:
+            print(f"⚠️ Canvas window cleanup warning: {e}")
+    
+    def close(self):
+        """Close the preview window and cleanup."""
+        self.cleanup()
     
     def is_closed(self) -> bool:
         """Check if window has been closed."""

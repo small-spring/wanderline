@@ -15,6 +15,7 @@ from geometry_msgs.msg import PointStamped
 # Message libraries
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Header
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 # tf2_ros: ROS 2 TF (TF: Transform Frame) library for coordinate transformations 
 from tf2_ros import TransformListener, Buffer
@@ -59,18 +60,33 @@ class RobotDrawerNode(Node):
     def __init__(self):
         super().__init__('phase1_robot_drawer')
         
-        # Load configuration
+        # ----------- Load configuration -----------
         config_loader = ConfigLoader('config.yaml')
         self.config = config_loader.load_config()
         # wanderline/robot/demos/phase1/config.yaml
+        # Pen physical specifications (from config)
+        pen_config = self.config.get('pen')
+        self.pen_length = pen_config.get('length') 
+        # Movement control (configurable)
+        movement_config = self.config.get('movement', {})
+        self.interpolation_steps = movement_config.get('interpolation_steps', 25)
         
+        # ------- Initialize Robot Posture -------
         # Initialize Phase 1 components
         self.system_state = create_default_system_state()
-        self.coord_calculator = create_coordinate_calculator(self.config['drawing'])
+            # SystemState(@dataclass): ロボット描画システム全体の状態管理
+            # - robot_joint_positions: Dict[str, float] - ジョイント角度辞書
+            # - calculated_wrist3_position: Tuple[float, float, float] - wrist3位置(base_link座標系)
+            # - contact_history: List[ContactPoint] - 接触履歴
+            # - completion_percentage: float - 描画完了率
+            # - target_shape: TargetCircle - 目標図形（中央(400,300) in pixel frame、半径80の円）
+
+        self.coord_calculator = create_coordinate_calculator(self.config['drawing']) 
+        # self.config['drawing'] とは何？ 描画ターゲットの中心点の座標など
         self.canvas_system = CanvasCoordinateSystem(self.config)
-        self.corrected_coords = CorrectedCoordinateSystem(self.config)  # Use corrected coordinate system
+        self.corrected_coords = CorrectedCoordinateSystem(self.config)  # Use corrected coordinate system ???
         
-        # Initialize Canvas Preview Window (if available)
+        # ------- Initialize Canvas Preview Window (if available) -------
         self.canvas_preview = None
         if CANVAS_PREVIEW_AVAILABLE:
             # Check if VNC display is available
@@ -89,8 +105,16 @@ class RobotDrawerNode(Node):
                 self.get_logger().warning(f"⚠️  Canvas Preview failed to initialize: {e}")
                 self.canvas_preview = None
         
+        # ----------- Initialize Robot Control Publishers -----------
         # Robot control (from existing robot_draw_circle.py)
         self.joint_pub = self.create_publisher(JointState, '/joint_states', 10)
+        
+        # Robot trajectory control for actual movement
+        self.trajectory_pub = self.create_publisher(
+            JointTrajectory, 
+            '/scaled_joint_trajectory_controller/joint_trajectory', 
+            10
+        )
         
         # Pen state publisher for RViz visualization -> RvizViewNode
         self.penstate_pub = self.create_publisher(PenState, '/pen_state', 10)
@@ -112,39 +136,73 @@ class RobotDrawerNode(Node):
         # TODO: canvas位置から初期姿勢の計算関数を作る
         # self.base_joints = self.corrected_coords.calculate_optimal_base_joints(self.config['canvas']['position'])
         self.base_joints = [0.0, -1.57, 1.57, -1.57, -1.57, 0.0]  # HARDCODE: temporary until auto-calculation
+
         self.current_joints = self.base_joints.copy()
-        self.target_joints = self.base_joints.copy()
+        self.target_joints = self.base_joints.copy() # ?
         
-        # Drawing state
+        # --------- STEP 1: Pen Down Initialization ---------
         self.current_pixel_position = (400, 300)  # Start at canvas center
+        self.pen_down(400, 300)  # Set pen down at center to start drawing # TODO: not working properly
         self.drawing_active = True
-        
-        # Movement control (configurable)
-        movement_config = self.config.get('movement', {})
-        
-        self.interpolation_steps = movement_config.get('interpolation_steps', 25)
+
         self.current_step = 0
         
-        # Pen physical specifications (from config)
-        pen_config = self.config.get('pen')
-        self.pen_length = pen_config.get('length')  
-        
         self.get_logger().info(f"🖊️  Canvas at Z={self.canvas_system.canvas_position[2]:.3f}m")
+        self.get_logger().info("🎯 Phase 1 Robot Drawer started!")
+        self.get_logger().info(f"📍 Starting at canvas center: {self.current_pixel_position}")
         
-        # Timer for smooth movement
+        # --------- STEP 2: Timer for Drawing Loop ---------
         update_rate = 1.0 / self.config['robot']['update_rate']
         self.timer = self.create_timer(update_rate, self.drawing_step)
         
-        # Now that base_joints is initialized, publish canvas marker
-        # self._publish_canvas_marker()
+
+    
+    def pen_down(self, pixel_x:float, pixel_y:float):
+        """
+        Set pen down at specified pixel coordinates.
+        Input:
+        - pixel_x: X coordinate in "pixel frame"
+        - pixel_y: Y coordinate in "pixel frame"
+        """
+        self.get_logger().info(f"🖊️  Pen down at pixel ({pixel_x}, {pixel_y})")
         
-        self.get_logger().info("🎯 Phase 1 Robot Drawer started!")
-        self.get_logger().info(f"📍 Starting at canvas center: {self.current_pixel_position}")
-    
-    
+        # Step 1: Convert "pixel frame" to "robot base frame"
+        robot_x, robot_y, robot_z = self.corrected_coords.pixel_to_robot_coords(
+            pixel_x, pixel_y, pen_down=True
+        )
+        # Step 2: Canvas表面の正確な高さを取得
+        canvas_z = self.canvas_system.canvas_position[2]
+        pen_tip_target_z = canvas_z + 0.001  # Canvas表面に軽く接触 (1mm)
+
+        # Step 3: ペン先位置からtool flange位置を逆算
+        tool_flange_x = robot_x
+        tool_flange_y = robot_y
+        tool_flange_z = pen_tip_target_z + self.pen_length  # ペン長分上に移動
+
+        # Step 4: 関節角度を計算
+        target_joints = self.corrected_coords.wrist3_coords_to_joints(
+            tool_flange_x, tool_flange_y, tool_flange_z, self.base_joints
+        )
+        target_joints[4] = 1.57  # Wrist 2: ペン下向き（Canvas向き）
+        target_joints[5] = 0.0    # Wrist 3: 回転なし
+
+        # Step 5: Send trajectory command to move robot
+        self._send_joint_trajectory(target_joints, duration=1.0)
+        
+        # Update internal state
+        self.current_joints = target_joints
+        self.target_joints = target_joints
+        self._publish_joint_state(target_joints)
+
+        # Step 6: 位置を更新
+        self.current_pixel_position = (pixel_x, pixel_y)
+        # TODO: if分岐を追加。ペンがcontactしている時としていない時で分岐
+        self.get_logger().info(f"✅ Pen contact established at canvas position ({pixel_x:.1f}, {pixel_y:.1f})")
+
     def drawing_step(self):
         """Main drawing loop step."""
         if not self.drawing_active:
+            print("🚫 Drawing is not active. Skipping step.")
             return
             
         # ✅ Step 1: Get actual wrist3 position using current interpolated joints
@@ -206,8 +264,6 @@ class RobotDrawerNode(Node):
         pen_tip_target_z = canvas_z + 0.001  # Just touch Canvas surface (1mm above)
         
         # Step 2: Calculate tool flange target position (reverse pen tip calculation)
-        # BUG FIX: tool flangeから下方向にペンが延びるので、逆算では上方向に移動
-        # Pen tip is pen_tip_offset BELOW tool flange, so tool flange should be ABOVE
         tool_flange_target_x = pen_tip_target_x
         tool_flange_target_y = pen_tip_target_y  
         tool_flange_target_z = pen_tip_target_z + self.pen_length  # Move tool flange UP by pen length
@@ -310,7 +366,7 @@ class RobotDrawerNode(Node):
     def _simulate_contact_detection(self, pixel_coord: tuple):
         """Simulate contact detection and update system state."""
         # ✅ CONSISTENT: Use pen tip position (same as trail and display)
-        pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(self.current_joints)
+        pen_tip_pos = self.corrected_coords.joints_to_pen_tip_position(self.current_joints) # ok
         
         # Calculate pen-canvas contact point using pen tip position
         pen_contact_pos = self._calculate_trail_display_position(pen_tip_pos)
@@ -332,11 +388,12 @@ class RobotDrawerNode(Node):
         
         # Update Canvas Preview Window with consistent contact point
         if self.canvas_preview:
-            self.canvas_preview.update_from_contact(contact_point)
+            self.canvas_preview.update_from_contact(contact_point) # ここで止まっている
         
-        # Update completion percentage
-        progress = self.coord_calculator._calculate_circle_progress(self.system_state)
-        self.system_state.update_completion_percentage(progress)
+        # Update completion percentage # TODO: 取り除く、もしくは実際の進捗計算を実装する
+        # progress = self.coord_calculator._calculate_circle_progress(self.system_state)
+        # self.get_logger().info(f"[DEBUG] Progress: {progress:.2%}")
+        # self.system_state.update_completion_percentage(progress)
     
     def _publish_joint_state(self, joint_positions: list):
         """Publish joint state message."""
@@ -349,6 +406,23 @@ class RobotDrawerNode(Node):
         msg.effort = [0.0] * len(self.joint_names) # todo: dummy efforts
 
         self.joint_pub.publish(msg)
+        self.get_logger().info(f"📡 Joint state published: {[f'{j:.3f}' for j in joint_positions]}")
+    
+    def _send_joint_trajectory(self, target_joints: list, duration: float = 2.0):
+        """Send joint trajectory command to move robot"""
+        msg = JointTrajectory()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.joint_names = self.joint_names
+        
+        point = JointTrajectoryPoint()
+        point.positions = target_joints
+        point.time_from_start.sec = int(duration)
+        point.time_from_start.nanosec = int((duration % 1) * 1e9)
+        
+        msg.points = [point]
+        self.trajectory_pub.publish(msg)
+        
+        self.get_logger().info(f"🚀 Trajectory command sent: duration={duration:.1f}s")
 
     def _publish_pen_state(self, pen_tip_pos: tuple, pen_body_pos: tuple, is_contact: bool):
         msg = PenState()
@@ -383,29 +457,65 @@ def main(args=None):
     
     rclpy.init(args=args)
     
+    drawer = None
+    rviz_viewer = None
+    executor = None
+    
     try:
-        from rclpy.executors import MultiThreadedExecutor
+        from rclpy.executors import SingleThreadedExecutor
         
         # Create both nodes
         drawer = RobotDrawerNode()
         rviz_viewer = RvizViewNode()
-        
-        # Use MultiThreadedExecutor for parallel execution
-        executor = MultiThreadedExecutor()
+        # Use SingleThreadedExecutor for parallel execution
+        executor = SingleThreadedExecutor()
         executor.add_node(drawer)
         executor.add_node(rviz_viewer)
         
         print("✅ Both nodes started successfully!")
         print("🎯 RobotDrawerNode: Drawing circle with Phase 1 algorithm...")
         print("🎨 RvizViewNode: Visualizing pen state in RViz...")
+        print("💡 Use Ctrl+C to stop gracefully")
         
         executor.spin()
-        
+        # TODO: GUI専用スレッド実装
+        # 理由: OpenCVスレッドセーフ問題の根本解決
+        # 優先度: Low (現在のSingleThreadedExecutorで十分動作)
+        # 実装方針: 
+        #   - canvas_preview.pyにGUI専用スレッド追加
+        #   - queueベースの非同期通信
+        #   - MultiThreadedExecutor復活
+
+
     except KeyboardInterrupt:
-        print("\n🎨 Phase 1 demo stopped by user")
+        print("\n🛑 Shutting down...")
+        
+        # Canvas cleanup
+        if drawer and hasattr(drawer, 'canvas_preview') and drawer.canvas_preview:
+            try:
+                drawer.canvas_preview.cleanup()
+            except:
+                pass
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        
     finally:
-        if rclpy.ok():
-            rclpy.shutdown()
+        # Quick cleanup
+        try:
+            if drawer:
+                drawer.destroy_node()
+            if rviz_viewer:
+                rviz_viewer.destroy_node()
+            if rclpy.ok():
+                rclpy.shutdown()
+            import cv2
+            cv2.destroyAllWindows()
+        except:
+            pass
+        
+        import os
+        os._exit(0)
 
 
 if __name__ == '__main__':
